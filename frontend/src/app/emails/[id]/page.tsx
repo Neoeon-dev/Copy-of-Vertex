@@ -50,7 +50,7 @@ export default function EmailDetailPage() {
 
   const score = risk?.score ?? (analysis ? Math.round(analysis.overall_risk_score * 100) : null)
   const level = risk?.level ?? (score === null ? 'UNASSESSED' : score >= 75 ? 'CRITICAL' : score >= 50 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW')
-  const categoryRows = useMemo<[string, number][]>(() => Object.entries(risk?.category_scores || {}).map(([key, value]) => [key, Number(value)]).sort((a, b) => Number(b[1]) - Number(a[1])), [risk])
+  const categoryRows = useMemo<[string, number][]>(() => Object.entries(risk?.category_scores || {}).map(([key, value]) => [key, Number(value)] as [string, number]).sort((a, b) => b[1] - a[1]), [risk])
   const topContribs = useMemo(() => risk?.contributions?.filter((x) => x.contribution > 0).sort((a, b) => b.contribution - a.contribution).slice(0, 8) ?? [], [risk])
 
   if (loading) return <Page><div className="space-y-4"><Skeleton className="h-14 w-3/4"/><div className="grid gap-4 lg:grid-cols-[1.5fr_1fr] lg:items-stretch"><Skeleton className="h-72"/><Skeleton className="h-72"/></div><Skeleton className="h-80"/></div></Page>
