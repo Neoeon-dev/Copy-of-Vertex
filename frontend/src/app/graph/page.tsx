@@ -17,7 +17,22 @@ export default function GraphPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(()=>{Promise.all([getCorrelationGraph(),getSharedInfrastructure()]).then(([g,s])=>{const ns=g.elements?.nodes?.map((x)=>x.data||{}) ?? g.nodes ?? []; const es=g.elements?.edges?.map((x)=>x.data||{}) ?? g.links ?? []; setNodes(ns); setEdges(es); setShared(s.shared||{})}).catch((e)=>setError(apiError(e))).finally(()=>setLoading(false))},[])
+  useEffect(() => {
+    Promise.all([getCorrelationGraph(), getSharedInfrastructure()])
+      .then(([g, s]) => {
+        const ns: GraphNode[] = g.elements?.nodes
+          ? g.elements.nodes.flatMap((item) => (item.data ? [item.data] : []))
+          : (g.nodes ?? [])
+        const es: GraphEdge[] = g.elements?.edges
+          ? g.elements.edges.flatMap((item) => (item.data ? [item.data] : []))
+          : (g.links ?? [])
+        setNodes(ns)
+        setEdges(es)
+        setShared(s.shared ?? {})
+      })
+      .catch((e) => setError(apiError(e)))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filtered = useMemo(()=>nodes.filter((node)=>{const type=(node.nodeType||node.type||'ENTITY').toUpperCase(); const q=query.toLowerCase(); return (filter==='ALL'||type===filter)&&(!q||`${node.label||''} ${node.id}`.toLowerCase().includes(q))}),[nodes,filter,query])
   const positions = useMemo(()=>{ const map = new Map<string,{x:number;y:number}>(); const n=Math.max(filtered.length,1); filtered.slice(0,30).forEach((node,i)=>{const angle=i/n*Math.PI*2-Math.PI/2; const radius=34+(i%3)*4; map.set(node.id,{x:50+Math.cos(angle)*radius,y:50+Math.sin(angle)*radius})}); return map },[filtered])
