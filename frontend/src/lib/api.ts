@@ -5,7 +5,10 @@ import type {
   MLClassification, RiskAssessment, SharedInfrastructure, IPAnalysis,
 } from '../types/api'
 
-const baseURL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
+const baseURL = (configuredApiUrl || (process.env.NODE_ENV === 'production'
+  ? 'https://vertex-8ko3.onrender.com'
+  : 'http://localhost:8000')).replace(/\/$/, '')
 
 const api = axios.create({
   baseURL: `${baseURL}/api`,

@@ -1,10 +1,10 @@
 # Vercel setup
 
-1. Put this frontend in the repository directory Vercel deploys.
-2. If the repository keeps `backend/` beside `frontend/`, set **Root Directory** to `frontend` in Vercel.
-3. Framework preset: **Next.js**.
-4. Build command: `npm run build`.
-5. Install command: `npm install`.
-6. Environment variable:
-   - `NEXT_PUBLIC_API_URL` = `https://vertex-8ko3.onrender.com`
-7. Remove any old Vite build command or Vite configuration for the deployed frontend.
+Project settings:
+
+- Framework: Next.js
+- Root Directory: `frontend`
+- Build Command: `npm run build`
+- Production API: `https://vertex-8ko3.onrender.com`
+
+`NEXT_PUBLIC_API_URL` may be set in Vercel for overrides. The app also has the production Render URL as a safe fallback, so a missing Vercel variable does not accidentally point a production browser at `localhost`.

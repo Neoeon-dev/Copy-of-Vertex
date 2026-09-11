@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:80",
         "http://localhost",
+        "https://copy-of-vertex.vercel.app",
     ]
 
     # Hard cap on uploaded .eml files, in megabytes. Every uploaded email is
