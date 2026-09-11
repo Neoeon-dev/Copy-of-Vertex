@@ -23,8 +23,8 @@
 - Backend changes: **None**. The existing graph payload contains nodes and edges sufficient for the requested visualization.
 - Root selection: strongest-connected email preferred; falls back to strongest-connected entity.
 - Layout: root at center; BFS depth determines visual shells.
-- 3D interaction: rotate, pan, zoom, node selection.
-- Node details: type, label, identifier, connection count, email navigation.
+- 3D interaction: rotate, pan, zoom, hover context, node selection without camera recentering.
+- Node details: type, label, identifier, connection count, email navigation; email nodes lazily load subject/sender/date for hover context.
 - Shared infrastructure: preserved from existing `/api/graph/shared` contract.
 - Filtering/search: preserved and applied before layout.
 - No product feature outside Item 2 added.

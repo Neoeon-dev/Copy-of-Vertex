@@ -248,7 +248,7 @@ export default function GraphPage() {
                 <div><div className="text-[10px] font-black uppercase tracking-wider text-text-tertiary">Identifier</div><div className="mt-1 break-all font-mono text-[10px] text-text-secondary">{selected.id}</div></div>
                 {selected.email_id ? <Link href={`/emails/${selected.email_id}`}><Button className="mt-2 w-full">Open email</Button></Link> : null}
               </div>
-            ) : <div className="mt-4 rounded-xl bg-surface-soft p-4 text-xs leading-5 text-text-tertiary">Select a node in the 3D workspace to inspect it. Drag to rotate, scroll to zoom, and pan to move around the investigation.</div>}
+            ) : <div className="mt-4 rounded-xl bg-surface-soft p-4 text-xs leading-5 text-text-tertiary">Select a node in the 3D workspace to inspect it. Hover a node for context. Click to inspect it without moving the camera; drag to rotate, scroll to zoom, and pan to move around the investigation.</div>}
           </Card>
         </div>
       </div>
