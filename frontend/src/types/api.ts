@@ -78,6 +78,7 @@ export type IPIntel = {
   geo: GeoInfo | null
   asn: ASNInfo | null
   warnings: string[]
+  source?: string | null
 }
 
 export type IPAnalysis = {

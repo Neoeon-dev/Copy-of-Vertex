@@ -14,6 +14,9 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import json
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -82,6 +85,7 @@ class IPIntelligence:
     geo: GeoInfo | None = None
     asn: ASNInfo | None = None
     warnings: list[str] = field(default_factory=list)
+    source: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -92,6 +96,7 @@ class IPIntelligence:
             "geo": self.geo.to_dict() if self.geo else None,
             "asn": self.asn.to_dict() if self.asn else None,
             "warnings": self.warnings,
+            "source": self.source,
         }
 
 
@@ -180,6 +185,61 @@ class GeoIPService:
             logger.warning("ASN lookup failed for %s: %s", ip, e)
             return None
 
+    def lookup_remote(self, ip: str) -> tuple[GeoInfo | None, ASNInfo | None]:
+        """Fallback lookup using ipapi.co when local MaxMind databases are unavailable.
+
+        This keeps the feature useful on managed deployments such as Render, where
+        GeoLite2 MMDB files are not automatically present. Only public IPs are
+        queried, and the response is not treated as precise physical location.
+        """
+        enabled = os.environ.get("GEOIP_REMOTE_FALLBACK", "true").strip().lower()
+        if enabled in {"0", "false", "no", "off"}:
+            return None, None
+
+        base = os.environ.get("GEOIP_REMOTE_URL", "https://ipapi.co/{ip}/json/")
+        url = base.format(ip=urllib.parse.quote(ip, safe=""))
+        try:
+            request = urllib.request.Request(
+                url,
+                headers={"User-Agent": "VERTEX/1.0 IP intelligence"},
+            )
+            with urllib.request.urlopen(request, timeout=4) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+
+            if not isinstance(payload, dict) or payload.get("error"):
+                return None, None
+
+            latitude = payload.get("latitude")
+            longitude = payload.get("longitude")
+            geo = GeoInfo(
+                country_code=payload.get("country_code"),
+                country_name=payload.get("country_name"),
+                region=payload.get("region"),
+                city=payload.get("city"),
+                latitude=float(latitude) if latitude is not None else None,
+                longitude=float(longitude) if longitude is not None else None,
+                accuracy_radius_km=None,
+            )
+
+            raw_asn = str(payload.get("asn") or "").strip()
+            asn_number = None
+            if raw_asn.upper().startswith("AS"):
+                raw_asn = raw_asn[2:]
+            try:
+                asn_number = int(raw_asn) if raw_asn else None
+            except ValueError:
+                asn_number = None
+
+            asn = ASNInfo(
+                asn=asn_number,
+                organization=payload.get("org"),
+                network=None,
+            )
+            return geo, asn
+        except Exception as exc:
+            logger.info("Remote GeoIP fallback failed for %s: %s", ip, exc)
+            return None, None
+
     def close(self) -> None:
         """Close database readers."""
         if self._city_reader:
@@ -225,10 +285,19 @@ def analyze_ip(ip: str) -> IPIntelligence:
         )
         return intel
 
-    # GeoIP lookup
+    # Prefer local MaxMind data. On managed deployments where the MMDB files are
+    # absent, fall back to a live IP geolocation provider so the UI still gets
+    # useful country/city/coordinate/ASN context.
     service = get_geoip_service()
     intel.geo = service.lookup_geo(ip)
     intel.asn = service.lookup_asn(ip)
+
+    if intel.geo or intel.asn:
+        intel.source = "MaxMind GeoLite2"
+    else:
+        intel.geo, intel.asn = service.lookup_remote(ip)
+        if intel.geo or intel.asn:
+            intel.source = "ipapi.co"
 
     if not intel.geo:
         intel.warnings.append("Geolocation data not available for this IP")

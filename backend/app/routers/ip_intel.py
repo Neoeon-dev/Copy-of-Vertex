@@ -46,6 +46,7 @@ class IPIntelOut(BaseModel):
     geo: GeoInfoOut | None = None
     asn: ASNInfoOut | None = None
     warnings: list[str] = Field(default_factory=list)
+    source: str | None = None
 
 
 class IPAnalysisOut(BaseModel):
