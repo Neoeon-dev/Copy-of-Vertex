@@ -53,6 +53,41 @@ export type AuthResultSimple = {
   details: string | null
 }
 
+
+export type GeoInfo = {
+  country_code: string | null
+  country_name: string | null
+  region: string | null
+  city: string | null
+  latitude: number | null
+  longitude: number | null
+  accuracy_radius_km: number | null
+}
+
+export type ASNInfo = {
+  asn: number | null
+  organization: string | null
+  network: string | null
+}
+
+export type IPIntel = {
+  ip: string
+  is_public: boolean | null
+  is_private: boolean | null
+  is_reserved: boolean | null
+  geo: GeoInfo | null
+  asn: ASNInfo | null
+  warnings: string[]
+}
+
+export type IPAnalysis = {
+  email_id: number
+  ips: IPIntel[]
+  total_ips: number
+  public_ips: number
+  private_ips: number
+}
+
 export type FullAnalysis = {
   email_id: number
   subject: string | null

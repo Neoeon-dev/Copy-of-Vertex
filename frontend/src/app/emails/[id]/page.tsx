@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { motion } from 'motion/react'
-import { Activity, CheckCircle2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, Mail, Paperclip, Server, ShieldAlert, ShieldCheck, Waypoints } from 'lucide-react'
+import { Activity, ArrowRight, CheckCircle2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, Mail, MapPinned, Paperclip, Server, ShieldAlert, ShieldCheck, Waypoints } from 'lucide-react'
 import { Alert, Badge, Button, Card, Page, PageHeader, Skeleton } from '../../../components/ui'
-import { addEmailToGraph, apiError, classifyEmail, computeRisk, getAuthentication, getEmail, getReportUrl, runFullAnalysis, verifyEvidence } from '../../../lib/api'
+import { addEmailToGraph, apiError, classifyEmail, computeRisk, getAuthentication, getEmail, getIpIntelligence, getReportUrl, runFullAnalysis, verifyEvidence } from '../../../lib/api'
 import { formatBytes, formatDate, humanize, riskTone } from '../../../lib/utils'
-import type { AuthenticationSummary, EmailDetail, FullAnalysis, MLClassification, RiskAssessment } from '../../../types/api'
+import type { AuthenticationSummary, EmailDetail, FullAnalysis, IPAnalysis, MLClassification, RiskAssessment } from '../../../types/api'
 
 export default function EmailDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +18,7 @@ export default function EmailDetailPage() {
   const [analysis, setAnalysis] = useState<FullAnalysis | null>(null)
   const [ml, setMl] = useState<MLClassification | null>(null)
   const [risk, setRisk] = useState<RiskAssessment | null>(null)
+  const [ipIntel, setIpIntel] = useState<IPAnalysis | null>(null)
   const [verification, setVerification] = useState<Awaited<ReturnType<typeof verifyEvidence>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -37,10 +38,10 @@ export default function EmailDetailPage() {
   async function runAnalysis() {
     setRunning(true); setError(''); setNotice('')
     try {
-      const [fullResult, classification, assessment] = await Promise.all([
-        runFullAnalysis(emailId), classifyEmail(emailId), computeRisk(emailId),
+      const [fullResult, classification, assessment, geoIntel] = await Promise.all([
+        runFullAnalysis(emailId), classifyEmail(emailId), computeRisk(emailId), getIpIntelligence(emailId),
       ])
-      setAnalysis(fullResult); setMl(classification); setRisk(assessment)
+      setAnalysis(fullResult); setMl(classification); setRisk(assessment); setIpIntel(geoIntel)
     } catch (e) { setError(apiError(e)) } finally { setRunning(false) }
   }
 
@@ -69,11 +70,20 @@ export default function EmailDetailPage() {
 
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
-        <Card className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div><div className="text-[10px] font-black uppercase tracking-[.14em] text-text-tertiary">Investigation</div><h2 className="mt-1 text-lg font-black">Evidence overview</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-text-secondary">The screen stays grounded in the actual API responses. Run the heavier forensic pipeline only when you want the expanded explanation.</p></div>
-            <Button onClick={runAnalysis} disabled={running} busy={running}><Activity size={15}/>{running ? 'Running analysis…' : analysis ? 'Re-run analysis' : 'Run full analysis'}</Button>
+        <Card className="p-6 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="text-[10px] font-black uppercase tracking-[.16em] text-primary">Analyst readout</div>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.025em]">{analysis || risk ? analystHeadline(level, ml?.label) : 'Turn the forensic signals into a clear investigation'}</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">{analysis || risk ? analystSummary(level, ml?.label, auth, analysis, ipIntel) : 'Run the analysis once to turn authentication, routing, links, domains, attachments, model output and IP intelligence into a human-readable investigation.'}</p>
+            </div>
+            <Button onClick={runAnalysis} disabled={running} busy={running} className="shrink-0"><Activity size={15}/>{running ? 'Running analysis…' : analysis ? 'Re-run analysis' : 'Run full analysis'}</Button>
           </div>
+          {(analysis || risk) ? <div className="mt-8 grid gap-3 md:grid-cols-3">
+            <Readout item="Sender" value={authVerdict(auth)} tone={authTone(auth)} />
+            <Readout item="Threat pattern" value={threatPattern(ml, risk)} tone={riskTone(level)} />
+            <Readout item="Infrastructure" value={infrastructureSummary(analysis, ipIntel)} tone="info" />
+          </div> : null}
         </Card>
 
         {risk || analysis ? <>
@@ -96,6 +106,8 @@ export default function EmailDetailPage() {
 
         <div className="grid gap-5 md:grid-cols-2"><AuthCard auth={auth}/><Card className="p-5"><SectionHeading icon={Mail} title="Message metadata"/><div className="mt-4 space-y-3"><Row label="From" value={email.sender}/><Row label="Display name" value={email.sender_name}/><Row label="Reply-To" value={email.reply_to}/><Row label="To" value={email.to.map((x) => x.address || x.name).filter(Boolean).join(', ') || '—'}/><Row label="Date" value={formatDate(email.date)}/><Row label="Message-ID" value={email.message_id}/></div></Card></div>
 
+        {analysis ? <GeoNetworkPanel intel={ipIntel}/> : null}
+
         <InvestigationTimeline email={email} auth={auth} analysis={analysis} risk={risk} verification={verification}/>
 
         {analysis ? <Card className="p-5"><SectionHeading icon={Server} title="Mail path & forensic indicators"/><div className="mt-4 grid gap-3 sm:grid-cols-4"><MiniMetric label="Received hops" value={analysis.total_hops}/><MiniMetric label="Public IPs" value={analysis.public_ips.length}/><MiniMetric label="Domains" value={analysis.domain_analysis.length}/><MiniMetric label="URLs" value={analysis.total_urls}/></div>{analysis.received_anomalies.length ? <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"><div className="font-bold">Header anomalies</div><ul className="mt-2 list-disc space-y-1 pl-4">{analysis.received_anomalies.map((x, i) => <li key={i}>{x}</li>)}</ul></div> : <div className="mt-4 rounded-xl bg-surface-soft p-3 text-xs text-text-secondary">No received-header anomalies were returned by the backend.</div>}</Card> : null}
@@ -115,6 +127,87 @@ export default function EmailDetailPage() {
       </div>
     </div>
   </Page>
+}
+
+function analystHeadline(level: string, label?: string | null) {
+  if (level === 'CRITICAL') return 'This message shows strong signs of a malicious campaign.'
+  if (level === 'HIGH') return 'This message has several signals that deserve investigation.'
+  if (level === 'MEDIUM') return 'This message has mixed signals and should be reviewed with context.'
+  if (label === 'legitimate') return 'The available evidence is broadly consistent with a legitimate message.'
+  return 'The current evidence does not indicate a strong threat pattern.'
+}
+
+function analystSummary(level: string, label: string | null | undefined, auth: AuthenticationSummary | null, analysis: FullAnalysis | null, ipIntel: IPAnalysis | null) {
+  const parts: string[] = []
+  const auths = [auth?.spf?.result, auth?.dkim?.result, auth?.dmarc?.result].filter(Boolean)
+  if (auths.some((value) => value === 'FAIL')) parts.push('At least one sender-authentication check failed.')
+  else if (auths.length && auths.every((value) => value === 'PASS')) parts.push('SPF, DKIM and DMARC are currently consistent with authenticated sending.')
+  if (analysis?.received_anomalies.length) parts.push(`${analysis.received_anomalies.length} mail-path anomal${analysis.received_anomalies.length === 1 ? 'y' : 'ies'} were returned.`)
+  if (analysis?.total_urls) parts.push(`${analysis.total_urls} link${analysis.total_urls === 1 ? '' : 's'} were found in the message.`)
+  if (ipIntel?.public_ips) parts.push(`${ipIntel.public_ips} public IP${ipIntel.public_ips === 1 ? '' : 's'} were enriched with network intelligence.`)
+  if (!parts.length) return `The current assessment is ${level.toLowerCase()} based on the available evidence.`
+  return parts.join(' ')
+}
+
+function authVerdict(auth: AuthenticationSummary | null) {
+  if (!auth) return 'Authentication not checked yet'
+  const values = [auth.spf?.result, auth.dkim?.result, auth.dmarc?.result].filter(Boolean)
+  if (values.some((v) => v === 'FAIL')) return 'Authentication has failures'
+  if (values.length && values.every((v) => v === 'PASS')) return 'Authentication checks pass'
+  return 'Authentication is mixed or incomplete'
+}
+
+function authTone(auth: AuthenticationSummary | null) {
+  if (!auth) return 'neutral' as const
+  const values = [auth.spf?.result, auth.dkim?.result, auth.dmarc?.result].filter(Boolean)
+  if (values.some((v) => v === 'FAIL')) return 'danger' as const
+  if (values.length && values.every((v) => v === 'PASS')) return 'success' as const
+  return 'warning' as const
+}
+
+function threatPattern(ml: MLClassification | null, risk: RiskAssessment | null) {
+  if (risk?.level === 'CRITICAL') return 'Strong malicious indicators'
+  if (risk?.level === 'HIGH') return 'Several concerning indicators'
+  if (ml?.label) return humanize(ml.label)
+  return 'Not assessed'
+}
+
+function infrastructureSummary(analysis: FullAnalysis | null, ipIntel: IPAnalysis | null) {
+  const publicCount = ipIntel?.public_ips ?? analysis?.public_ips.length ?? 0
+  const domains = analysis?.domain_analysis.length ?? 0
+  return `${publicCount} public IP${publicCount === 1 ? '' : 's'} · ${domains} domain${domains === 1 ? '' : 's'}`
+}
+
+function Readout({ item, value, tone }: { item: string; value: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }) {
+  return <div className="rounded-2xl border border-border bg-surface-soft px-4 py-4"><div className="text-[10px] font-black uppercase tracking-[.12em] text-text-tertiary">{item}</div><div className="mt-2 flex items-start gap-2"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warning' ? 'bg-warning' : tone === 'success' ? 'bg-success' : tone === 'info' ? 'bg-info' : 'bg-text-tertiary'}`}/><div className="text-sm font-semibold leading-5">{value}</div></div></div>
+}
+
+function GeoNetworkPanel({ intel }: { intel: IPAnalysis | null }) {
+  const publicIps = intel?.ips.filter((ip) => ip.is_public) ?? []
+  const mapped = publicIps.filter((ip) => ip.geo?.latitude != null && ip.geo?.longitude != null)
+  const withNetwork = publicIps.filter((ip) => ip.asn?.asn != null)
+  if (!intel) return <Card className="p-6"><SectionHeading icon={MapPinned} title="Geographic & network intelligence"/><p className="mt-3 text-sm text-text-secondary">IP enrichment appears after the forensic analysis runs.</p></Card>
+  return <Card className="overflow-hidden p-0"><div className="p-6 sm:p-7"><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><SectionHeading icon={MapPinned} title="Geographic & network intelligence"/><p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">Approximate infrastructure context for public IPs observed in the message. This is intelligence about the network, not proof of an attacker’s physical location.</p></div><Badge tone="info">{publicIps.length} public IP{publicIps.length === 1 ? '' : 's'}</Badge></div>
+<div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+<div className="rounded-2xl border border-border bg-slate-950 p-4 text-white dark:bg-[#0b1220]"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-black uppercase tracking-[.12em] text-slate-300">Approximate network map</span><span className="text-[10px] text-slate-400">{mapped.length} mapped</span></div><GeoMap points={mapped}/></div>
+<div className="space-y-3">{publicIps.map((ip) => <GeoIntelRow key={ip.ip} intel={ip}/>)}{!publicIps.length ? <div className="rounded-2xl border border-dashed border-border p-5 text-sm text-text-tertiary">No public IPs were returned by the analysis.</div> : null}</div>
+</div>
+</div><div className="grid border-t border-border sm:grid-cols-3"><MiniMetric label="Public IPs" value={intel.public_ips}/><MiniMetric label="Mapped locations" value={mapped.length}/><MiniMetric label="ASN matches" value={withNetwork.length}/></div></Card>
+}
+
+function GeoMap({ points }: { points: IPAnalysis['ips'] }) {
+  const projectX = (lng: number) => 8 + ((lng + 180) / 360) * 84
+  const projectY = (lat: number) => 8 + ((90 - Math.max(-65, Math.min(85, lat))) / 150) * 84
+  return <div className="relative aspect-[2/1] overflow-hidden rounded-xl border border-white/10 bg-[radial-gradient(circle_at_50%_20%,rgba(99,102,241,.22),transparent_48%),linear-gradient(160deg,#111827,#07101f)]">
+    <div className="absolute inset-[8%] rounded-[40%] border border-white/5"/><div className="absolute left-0 right-0 top-1/2 border-t border-white/5"/><div className="absolute bottom-0 left-1/2 top-0 border-l border-white/5"/>
+    {points.map((point) => { const lat=point.geo?.latitude; const lng=point.geo?.longitude; if (lat == null || lng == null) return null; const x=projectX(lng), y=projectY(lat); return <div key={point.ip} className="group absolute" style={{left:`${x}%`,top:`${y}%`}}><div className="-translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-200/70 bg-cyan-300 shadow-[0_0_0_8px_rgba(103,232,249,.08),0_0_28px_rgba(34,211,238,.5)]"><div className="h-3 w-3 rounded-full"/></div><div className="pointer-events-none absolute left-1/2 top-4 z-10 w-44 -translate-x-1/2 rounded-lg border border-white/10 bg-slate-950/95 p-2 text-[10px] opacity-0 shadow-xl transition group-hover:opacity-100"><div className="font-mono font-bold text-white">{point.ip}</div><div className="mt-1 text-slate-300">{point.geo?.city || 'Unknown city'}, {point.geo?.country_name || point.geo?.country_code || 'Unknown country'}</div><div className="mt-1 text-slate-400">{point.asn?.organization || 'ASN unavailable'}</div></div></div>})}
+    <div className="absolute bottom-3 left-3 rounded-full bg-black/30 px-2.5 py-1 text-[9px] font-semibold text-slate-300 backdrop-blur">Approximate location context</div>
+  </div>
+}
+
+function GeoIntelRow({ intel }: { intel: IPAnalysis['ips'][number] }) {
+  const location = [intel.geo?.city, intel.geo?.region, intel.geo?.country_name || intel.geo?.country_code].filter(Boolean).join(', ') || 'Location unavailable'
+  return <div className="rounded-2xl border border-border bg-surface-soft p-4"><div className="flex items-start justify-between gap-3"><div><div className="font-mono text-xs font-bold">{intel.ip}</div><div className="mt-1 text-sm font-semibold">{location}</div></div><Badge tone={intel.asn?.asn ? 'info' : 'neutral'}>{intel.asn?.asn ? `AS${intel.asn.asn}` : 'No ASN'}</Badge></div><div className="mt-3 grid gap-3 sm:grid-cols-2"><div><div className="text-[10px] font-black uppercase tracking-wider text-text-tertiary">Network</div><div className="mt-1 text-xs text-text-secondary">{intel.asn?.organization || 'Unavailable'}</div></div><div><div className="text-[10px] font-black uppercase tracking-wider text-text-tertiary">Range</div><div className="mt-1 break-all font-mono text-[10px] text-text-secondary">{intel.asn?.network || 'Unavailable'}</div></div></div>{intel.geo?.accuracy_radius_km ? <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[10px] font-semibold text-text-tertiary">Approx. radius {intel.geo.accuracy_radius_km} km</div> : null}{intel.warnings?.length ? <div className="mt-3 text-[10px] leading-4 text-warning">{intel.warnings[0]}</div> : null}</div>
 }
 
 function RiskGauge({ score, level }: { score: number; level: string }) {

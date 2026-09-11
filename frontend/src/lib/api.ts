@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios'
 import type {
   AuditLog, AuditVerification, AuthenticationSummary, Case, CaseEmail, CorrelationGraph,
   EmailDetail, EmailSummary, EvidenceVerification, FullAnalysis, GraphNode, GraphEdge,
-  MLClassification, RiskAssessment, SharedInfrastructure,
+  MLClassification, RiskAssessment, SharedInfrastructure, IPAnalysis,
 } from '../types/api'
 
 const baseURL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
@@ -55,6 +55,11 @@ export async function classifyEmail(id: number | string): Promise<MLClassificati
 
 export async function computeRisk(id: number | string): Promise<RiskAssessment> {
   const { data } = await api.post<RiskAssessment>(`/emails/${id}/risk`)
+  return data
+}
+
+export async function getIpIntelligence(id: number | string): Promise<IPAnalysis> {
+  const { data } = await api.get<IPAnalysis>(`/emails/${id}/ip-intel`)
   return data
 }
 
