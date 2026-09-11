@@ -1,0 +1,1 @@
+"""MailTrace backend application package."""

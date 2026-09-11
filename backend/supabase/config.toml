@@ -1,0 +1,37 @@
+# MailTrace Supabase Configuration
+# This file configures the Supabase project settings
+
+[project]
+id = "mailtrace"
+
+[db]
+port = 5432
+shadow_port = 5433
+major_version = 15
+
+[db.pooler]
+enabled = true
+port = 5432
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[api]
+enabled = true
+port = 8000
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = false
+# Enable if implementing user authentication
+# site_url = "http://localhost:5173"
+# additional_redirect_urls = ["https://localhost:3000"]
+# jwt_expiry = 3600
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
