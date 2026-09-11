@@ -1,0 +1,31 @@
+{
+  "model_version": "1.0.0",
+  "chosen_method": "uncalibrated",
+  "selection_rationale": "Selected uncalibrated with Brier Score=0.1356 and ECE=0.017 (Macro F1: 0.9006).",
+  "comparison": {
+    "uncalibrated": {
+      "brier_score": 0.1356,
+      "log_loss": 0.2477,
+      "expected_calibration_error": 0.017,
+      "macro_f1": 0.9006,
+      "phishing_f1": 0.8828,
+      "phishing_pr_auc": 0.948
+    },
+    "sigmoid": {
+      "brier_score": 0.1406,
+      "log_loss": 0.2638,
+      "expected_calibration_error": 0.0382,
+      "macro_f1": 0.9027,
+      "phishing_f1": 0.8821,
+      "phishing_pr_auc": 0.9389
+    },
+    "isotonic": {
+      "brier_score": 0.1359,
+      "log_loss": 0.2535,
+      "expected_calibration_error": 0.0373,
+      "macro_f1": 0.9052,
+      "phishing_f1": 0.8849,
+      "phishing_pr_auc": 0.9435
+    }
+  }
+}

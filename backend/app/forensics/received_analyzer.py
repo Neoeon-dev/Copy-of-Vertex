@@ -148,7 +148,10 @@ def _parse_timestamp(date_str: str) -> datetime | None:
     if not date_str:
         return None
     try:
-        return parsedate_to_datetime(date_str)
+        dt = parsedate_to_datetime(date_str)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     except (ValueError, TypeError):
         return None
 

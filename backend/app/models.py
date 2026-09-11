@@ -12,9 +12,11 @@ Relationship notes
   metadata is returned by the JSON API.
 """
 from datetime import datetime, timezone
+import uuid
 
 from sqlalchemy import (JSON, BigInteger, DateTime, ForeignKey, LargeBinary,
-                        String, Text)
+                        String, Text, UUID, Integer, Float, Boolean,
+                        UniqueConstraint, Index)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -84,9 +86,35 @@ class Email(Base):
     authentication_results: Mapped[list["EmailAuthenticationResult"]] = relationship(
         back_populates="email", cascade="all, delete-orphan"
     )
+    raw_payload: Mapped["EmailRawPayload | None"] = relationship(
+        back_populates="email", uselist=False, cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Email id={self.id} sha256={self.sha256[:12]}…>"
+
+
+class EmailRawPayload(Base):
+    """Pristine raw .eml evidence payload.
+
+    Stores the exact unadulterated uploaded bytes without re-encoding, line-ending
+    normalization, or truncation. Used for cryptographic DKIM verification and
+    Section 65B/BSA 2023 evidence integrity.
+    """
+
+    __tablename__ = "email_raw_payloads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email_id: Mapped[int] = mapped_column(
+        ForeignKey("emails.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    raw_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+
+    email: Mapped[Email] = relationship(back_populates="raw_payload")
 
 
 class EmailHeader(Base):
@@ -203,3 +231,57 @@ class EvidenceChain(Base):
         DateTime(timezone=True), default=_utcnow
     )
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class GraphNode(Base):
+    """Canonical graph node for forensic correlation."""
+
+    __tablename__ = "graph_nodes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    node_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    node_type: Mapped[str] = mapped_column(String(50), nullable=False)  # EMAIL, SENDER, DOMAIN, IP, URL, FILE, FILE_HASH, ATTACHMENT, CASE, THREAT_INTEL_PROVIDER, CAMPAIGN
+    canonical_value: Mapped[str] = mapped_column(String(255), nullable=False)  # normalized/deduplicated value
+    display_value: Mapped[str | None] = mapped_column(String(255), nullable=True)  # original value for display
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_count: Mapped[int] = mapped_column(Integer, default=0)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+
+    # Ensure deduplication by node type and canonical value
+    __table_args__ = (UniqueConstraint('node_type', 'canonical_value', name='uq_node_type_canonical_value'),)
+
+
+class GraphEdge(Base):
+    """Canonical graph edge representing a relationship between nodes."""
+
+    __tablename__ = "graph_edges"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    edge_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    source_node_id: Mapped[str] = mapped_column(String(255), ForeignKey("graph_nodes.node_id"), nullable=False)
+    target_node_id: Mapped[str] = mapped_column(String(255), ForeignKey("graph_nodes.node_id"), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g., CONTAINS_URL, BELONGS_TO_DOMAIN, etc.
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    observation_count: Mapped[int] = mapped_column(Integer, default=0)
+    source_email_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("emails.id"), nullable=True)
+    source_case_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("cases.id"), nullable=True)
+    source_provider: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g., VirusTotal, OpenPhish
+    evidence_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # EMAIL_HEADER, URL_EXTRACTION, etc.
+    evidence_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)  # e.g., "Received header #2"
+    is_inferred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # True for inferred/correlated edges
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+    # Indexes for query performance
+    __table_args__ = (
+        Index('ix_graph_edges_source_node', 'source_node_id'),
+        Index('ix_graph_edges_target_node', 'target_node_id'),
+        Index('ix_graph_edges_relationship_type', 'relationship_type'),
+        Index('ix_graph_edges_source_email', 'source_email_id'),
+        Index('ix_graph_edges_source_case', 'source_case_id'),
+    )

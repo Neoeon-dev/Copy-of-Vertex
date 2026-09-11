@@ -165,7 +165,7 @@ export default function GraphPage() {
   return (
     <Page>
       <PageHeader
-        eyebrow="Campaign intelligence"
+        eyebrow="Correlation"
         title="Threat correlation"
         description="Explore the relationships VERTEX found between emails, senders, domains, IPs, cases and other evidence."
         actions={
@@ -186,7 +186,7 @@ export default function GraphPage() {
             <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 text-sm font-black"><Share2 size={15} className="text-primary" /> 3D relationship map</div>
-                <p className="mt-1 text-xs text-text-secondary">The most-connected email or entity is centered as the investigation root.</p>
+                <p className="mt-1 text-xs text-text-secondary">The most-connected email or entity is placed at the center of the network.</p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
                 <div className="flex flex-wrap gap-1.5">
@@ -220,8 +220,8 @@ export default function GraphPage() {
 
         <div className="space-y-5">
           <Card className="p-5">
-            <div className="flex items-center gap-2 text-sm font-black"><Sparkles size={15} className="text-primary" /> Investigation root</div>
-            <p className="mt-1 text-xs leading-5 text-text-secondary">VERTEX centers the strongest connected email/entity so the surrounding infrastructure is easier to read.</p>
+            <div className="flex items-center gap-2 text-sm font-black"><Sparkles size={15} className="text-primary" /> Center node</div>
+            <p className="mt-1 text-xs leading-5 text-text-secondary">The most-connected email or entity is used as the starting point for the network.</p>
             {rootId ? <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/30"><div className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Centered entity</div><div className="mt-1 break-all text-sm font-bold text-indigo-950 dark:text-indigo-100">{positioned.find((node) => node.id === rootId)?.label || rootId}</div></div> : null}
           </Card>
 

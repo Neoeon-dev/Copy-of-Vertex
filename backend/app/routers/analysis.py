@@ -19,10 +19,12 @@ from ..forensics.ip_intelligence import analyze_ips, extract_ips_from_headers
 from ..forensics.received_analyzer import parse_received_headers
 from ..forensics.spf_analyzer import analyze_spf
 from ..forensics.dkim_analyzer import analyze_dkim
-from ..forensics.dmarc_analyzer import analyze_dmarc
+from ..forensics.dmarc_analyzer import analyze_dmarc, extract_domain_from_address
 from ..forensics.url_analyzer import analyze_urls, extract_urls_from_email
+from ..engine import get_canonical_risk_engine
 from ..models import Email
 from ..utils import get_headers_dict
+from ..engine.response_policy import evaluate_risk_assessment
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ class FullAnalysisOut(BaseModel):
     total_urls: int = 0
     attachment_analysis: list[dict[str, Any]] = Field(default_factory=list)
     overall_risk_score: float = 0.0
+    response_recommendation: dict[str, Any] | None = None
 
 
 @router.post("/{email_id}/analyze-full", response_model=FullAnalysisOut)
@@ -63,10 +66,11 @@ def run_full_analysis(email_id: int, db: Annotated[Session, Depends(get_db)]):
 
     try:
         headers = get_headers_dict(email_record.headers)
-        from_domain = email_record.sender
+        from_domain = extract_domain_from_address(email_record.sender) if email_record.sender else None
+        raw_bytes = email_record.raw_payload.raw_bytes if hasattr(email_record, "raw_payload") and email_record.raw_payload else None
 
         spf = analyze_spf(headers=headers, email_sender_domain=from_domain)
-        dkim_results = analyze_dkim(headers=headers, raw_email_bytes=None, email_sender_domain=from_domain)
+        dkim_results = analyze_dkim(headers=headers, raw_email_bytes=raw_bytes, email_sender_domain=from_domain)
         dkim_first = dkim_results[0] if dkim_results else None
         spf_envelope = spf.domain if spf.domain != from_domain else None
         dmarc = analyze_dmarc(
@@ -83,23 +87,29 @@ def run_full_analysis(email_id: int, db: Annotated[Session, Depends(get_db)]):
         att_dicts = [{"filename": a.filename, "content_type": a.content_type, "size": a.size, "sha256": a.sha256} for a in email_record.attachments]
         att_analyses = analyze_attachments(att_dicts)
 
-        risk_signals = []
-        if spf.result in ("FAIL", "SOFTFAIL"):
-            risk_signals.append(0.3)
-        if dkim_first and dkim_first.result == "FAIL":
-            risk_signals.append(0.3)
-        if dmarc.result == "FAIL":
-            risk_signals.append(0.2)
-        for da in domain_analyses:
-            if da.risk_score > 0:
-                risk_signals.append(da.risk_score * 0.3)
-        for ua in url_analyses:
-            if ua.risk_score > 0:
-                risk_signals.append(ua.risk_score * 0.2)
-        for aa in att_analyses:
-            if aa.risk_score > 0:
-                risk_signals.append(aa.risk_score * 0.3)
-        overall_risk = min(1.0, sum(risk_signals)) if risk_signals else 0.0
+        engine = get_canonical_risk_engine()
+        assessment = engine.assess(
+            spf_result=spf.result,
+            dkim_result=dkim_first.result if dkim_first else None,
+            dmarc_result=dmarc.result,
+            spf_domain=spf.domain,
+            dkim_domain=dkim_first.domain if dkim_first else None,
+            sender=email_record.sender,
+            sender_name=email_record.sender_name,
+            reply_to=email_record.reply_to,
+            domain_analyses=[da.to_dict() for da in domain_analyses],
+            url_analyses=[ua.to_dict() for ua in url_analyses],
+            attachment_analyses=[aa.to_dict() for aa in att_analyses],
+            received_anomalies=received.anomalies,
+            total_hops=received.total_hops,
+            ip_analyses=[ia.to_dict() for ia in ip_analyses],
+            subject=email_record.subject,
+            body=email_record.body_text or email_record.body_html,
+        )
+        overall_risk = assessment.risk_score
+
+        # D5.1: Generate response policy recommendation
+        recommendation = evaluate_risk_assessment(assessment)
 
         return FullAnalysisOut(
             email_id=email_id, subject=email_record.subject, sender=email_record.sender,
@@ -111,6 +121,18 @@ def run_full_analysis(email_id: int, db: Annotated[Session, Depends(get_db)]):
             domain_analysis=[da.to_dict() for da in domain_analyses], urls=[ua.to_dict() for ua in url_analyses],
             total_urls=len(urls), attachment_analysis=[aa.to_dict() for aa in att_analyses],
             overall_risk_score=round(overall_risk, 3),
+            response_recommendation={
+                "recommended_action": recommendation.recommended_action.value,
+                "approval_required": recommendation.approval_required,
+                "reversible": recommendation.reversible,
+                "rationale": recommendation.rationale,
+                "severity": recommendation.severity,
+                "risk_score": recommendation.risk_score,
+                "confidence": recommendation.confidence,
+                "uncertainty": recommendation.uncertainty,
+                "evidence_quality": recommendation.evidence_quality,
+                "policy_version": recommendation.policy_version.value,
+            },
         )
     except HTTPException:
         raise

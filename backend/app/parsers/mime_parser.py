@@ -70,105 +70,209 @@ class ParsedEmail:
 
 def _decode_header_value(raw_value: str) -> str:
     """Decode an RFC-2047 encoded header value to a plain string."""
-    if raw_value is None:
+    if not raw_value:
         return ""
-    # email.header.decode_header returns list of (bytes, charset) or (str, None)
-    from email.header import decode_header
+    try:
+        from email.header import decode_header
 
-    parts = decode_header(raw_value)
-    decoded_parts: list[str] = []
-    for data, charset in parts:
-        if isinstance(data, bytes):
-            decoded_parts.append(data.decode(charset or "utf-8", errors="replace"))
-        else:
-            decoded_parts.append(str(data))
-    return "".join(decoded_parts)
+        parts = decode_header(raw_value)
+        decoded_parts: list[str] = []
+        for data, charset in parts:
+            if isinstance(data, bytes):
+                decoded_parts.append(data.decode(charset or "utf-8", errors="replace"))
+            else:
+                decoded_parts.append(str(data))
+        return "".join(decoded_parts)
+    except Exception as e:
+        logger.warning("Failed to decode header value %r: %s", raw_value, e)
+        return str(raw_value)
+
+
+def _safe_header_value(value: Any) -> str:
+    """Safely convert header value to string, decoding RFC-2047 if needed."""
+    if value is None:
+        return ""
+    try:
+        val_str = str(value)
+        if "=?" in val_str and "?=" in val_str:
+            val_str = _decode_header_value(val_str)
+        return val_str.replace("\x00", "\ufffd")
+    except Exception as e:
+        logger.warning("Error converting header value %r: %s", value, e)
+        return ""
+
+
+def _sanitize_for_db(val: str | None) -> str | None:
+    """Sanitize string fields by replacing NUL bytes with unicode replacement characters."""
+    if val is None:
+        return None
+    return val.replace("\x00", "\ufffd")
 
 
 def _parse_recipients(value: str | None) -> list[dict[str, str | None]]:
     """Parse a To/CC header into a list of {name, address} dicts."""
     if not value:
         return []
-    from email.utils import getaddresses
+    try:
+        from email.utils import getaddresses
 
-    pairs = getaddresses([value])
-    return [{"name": name or None, "address": addr or None} for name, addr in pairs]
+        pairs = getaddresses([value])
+        return [{"name": name or None, "address": addr or None} for name, addr in pairs]
+    except Exception as e:
+        logger.warning("Failed to parse recipient addresses from %r: %s", value, e)
+        return []
 
 
 def _extract_sender_info(msg: EmailMessage) -> tuple[str | None, str | None]:
     """Return (email_address, display_name) from the From header."""
-    raw_from = msg.get("From", "")
-    from email.utils import parseaddr
+    try:
+        raw_from = _safe_header_value(msg.get("From", ""))
+        if not raw_from:
+            return (None, None)
+        from email.utils import parseaddr
 
-    # parseaddr returns (display_name, email_address)
-    name, addr = parseaddr(raw_from)
-    return (addr or None, name or None)
+        name, addr = parseaddr(raw_from)
+        return (addr or None, name or None)
+    except Exception as e:
+        logger.warning("Failed to extract sender info: %s", e)
+        return (None, None)
 
 
 def _extract_body(msg: EmailMessage) -> tuple[str | None, str | None]:
-    """Walk the message and extract plain-text and HTML bodies."""
+    """Extract plain-text and HTML bodies for the primary email.
+
+    Traverses the MIME tree without descending into attachments or nested
+    message/rfc822 subparts.
+    """
     body_text: str | None = None
     body_html: str | None = None
 
-    if msg.is_multipart():
-        for part in msg.walk():
-            ct = part.get_content_type()
-            disp = str(part.get("Content-Disposition", ""))
-            # Skip attachments
-            if "attachment" in disp:
-                continue
-            payload = part.get_payload(decode=True)
-            if payload is None:
-                continue
-            charset = part.get_content_charset() or "utf-8"
-            text = payload.decode(charset, errors="replace")
-            if ct == "text/plain" and body_text is None:
-                body_text = text
-            elif ct == "text/html" and body_html is None:
-                body_html = text
-    else:
-        ct = msg.get_content_type()
-        payload = msg.get_payload(decode=True)
-        if payload:
-            charset = msg.get_content_charset() or "utf-8"
-            text = payload.decode(charset, errors="replace")
-            if ct == "text/plain":
-                body_text = text
-            elif ct == "text/html":
-                body_html = text
+    def _walk_body(part: EmailMessage) -> None:
+        nonlocal body_text, body_html
+        if part is not msg:
+            disp = str(part.get("Content-Disposition", "")).lower()
+            if "attachment" in disp or part.get_content_type() == "message/rfc822":
+                return
 
+        if part.is_multipart():
+            try:
+                subparts = list(part.iter_parts())
+            except Exception:
+                payload = part.get_payload()
+                subparts = payload if isinstance(payload, list) else []
+            for subpart in subparts:
+                _walk_body(subpart)
+        else:
+            ct = part.get_content_type()
+            try:
+                payload = part.get_payload(decode=True)
+            except Exception as e:
+                logger.warning("Failed to decode part payload: %s", e)
+                payload = None
+
+            if payload is not None:
+                charset = part.get_content_charset() or "utf-8"
+                try:
+                    text = payload.decode(charset, errors="replace")
+                except Exception:
+                    text = payload.decode("utf-8", errors="replace")
+                if ct == "text/plain" and body_text is None:
+                    body_text = text
+                elif ct == "text/html" and body_html is None:
+                    body_html = text
+
+    _walk_body(msg)
     return body_text, body_html
 
 
 def _extract_attachments(msg: EmailMessage) -> list[ParsedAttachment]:
-    """Walk the message and extract attachment metadata + inert bytes."""
+    """Walk the message and extract attachment metadata + inert bytes.
+
+    Captures:
+    - Standard attachments with Content-Disposition: attachment or filename
+    - Encapsulated message/rfc822 emails as .eml attachments
+    """
     attachments: list[ParsedAttachment] = []
 
-    if not msg.is_multipart():
-        return attachments
-
     for part in msg.walk():
-        disp = str(part.get("Content-Disposition", ""))
-        if "attachment" not in disp:
+        if part is msg:
             continue
 
-        filename = part.get_filename() or None
+        ct = part.get_content_type()
+        disp = str(part.get("Content-Disposition", "")).lower()
+        filename = part.get_filename() or part.get_param("name")
+
         if filename:
-            from email.header import decode_header
+            try:
+                from email.header import decode_header
 
-            parts = decode_header(filename)
-            decoded: list[str] = []
-            for data, charset in parts:
-                if isinstance(data, bytes):
-                    decoded.append(data.decode(charset or "utf-8", errors="replace"))
+                parts = decode_header(filename)
+                decoded: list[str] = []
+                for data, charset in parts:
+                    if isinstance(data, bytes):
+                        decoded.append(data.decode(charset or "utf-8", errors="replace"))
+                    else:
+                        decoded.append(str(data))
+                filename = "".join(decoded)
+            except Exception as e:
+                logger.warning("Failed to decode attachment filename %r: %s", filename, e)
+
+        # 1. Encapsulated message/rfc822 (.eml)
+        if ct == "message/rfc822":
+            if not filename:
+                filename = "attached_message.eml"
+            elif not filename.lower().endswith(".eml"):
+                filename = f"{filename}.eml"
+
+            sub_payload = part.get_payload()
+            try:
+                if isinstance(sub_payload, list) and len(sub_payload) > 0:
+                    first_child = sub_payload[0]
+                    if hasattr(first_child, "as_bytes"):
+                        payload_bytes = first_child.as_bytes()
+                    elif isinstance(first_child, bytes):
+                        payload_bytes = first_child
+                    else:
+                        payload_bytes = str(first_child).encode("utf-8", errors="replace")
+                elif hasattr(sub_payload, "as_bytes"):
+                    payload_bytes = sub_payload.as_bytes()
+                elif isinstance(sub_payload, bytes):
+                    payload_bytes = sub_payload
                 else:
-                    decoded.append(str(data))
-            filename = "".join(decoded)
+                    payload_bytes = part.as_bytes()
+            except Exception as e:
+                logger.warning("Failed to extract message/rfc822 payload bytes: %s", e)
+                payload_bytes = b""
 
-        content_type = part.get_content_type() or "application/octet-stream"
-        payload = part.get_payload(decode=True) or b""
+            sha256 = hashlib.sha256(payload_bytes).hexdigest()
+            attachments.append(
+                ParsedAttachment(
+                    filename=filename,
+                    content_type="message/rfc822",
+                    size=len(payload_bytes),
+                    sha256=sha256,
+                    content=payload_bytes,
+                )
+            )
+            continue
+
+        # Skip multipart containers
+        if part.get_content_maintype() == "multipart":
+            continue
+
+        # 2. Standard attachments
+        is_attachment = ("attachment" in disp) or (filename is not None)
+        if not is_attachment:
+            continue
+
+        content_type = ct or "application/octet-stream"
+        try:
+            payload = part.get_payload(decode=True) or b""
+        except Exception as e:
+            logger.warning("Failed to decode attachment payload: %s", e)
+            payload = b""
+
         sha256 = hashlib.sha256(payload).hexdigest()
-
         attachments.append(
             ParsedAttachment(
                 filename=filename,
@@ -186,14 +290,22 @@ def _extract_all_headers(msg: EmailMessage) -> list[ParsedHeader]:
     """Extract ALL headers preserving original order.
 
     Uses ``email.message.Message.items()`` which yields headers in the
-    order they appear in the raw message.
+    order they appear in the raw message. Preserves custom, RFC, and
+    unknown headers.
     """
     headers: list[ParsedHeader] = []
-    for position, (name, value) in enumerate(msg.items()):
+    try:
+        items = list(msg.items())
+    except Exception as e:
+        logger.warning("Failed to iterate message items: %s", e)
+        return headers
+
+    for position, (name, value) in enumerate(items):
+        safe_val = _safe_header_value(value)
         headers.append(
             ParsedHeader(
-                name=name,
-                value=value or "",
+                name=str(name),
+                value=safe_val,
                 position=position,
             )
         )
@@ -223,30 +335,45 @@ def parse_email(raw_bytes: bytes) -> ParsedEmail:
     raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
 
     # Parse with the stdlib email parser using a strict-ish policy
-    msg: EmailMessage = message_from_bytes(
-        raw_bytes, policy=email.policy.default
-    )
+    try:
+        msg: EmailMessage = message_from_bytes(
+            raw_bytes, policy=email.policy.default
+        )
+    except Exception as e:
+        logger.warning("Default policy parsing failed, falling back to compat32: %s", e)
+        try:
+            msg = message_from_bytes(raw_bytes, policy=email.policy.compat32)
+        except Exception as e2:
+            logger.error("All email parsing failed: %s", e2)
+            return ParsedEmail(
+                raw_sha256=raw_sha256,
+                raw_size=len(raw_bytes),
+                subject="(Unparseable Email)",
+            )
 
     # Metadata
     sender_addr, sender_name = _extract_sender_info(msg)
-    date_value = _parse_date(msg.get("Date"))
+    date_value = _parse_date(_safe_header_value(msg.get("Date")))
     body_text, body_html = _extract_body(msg)
     attachments = _extract_attachments(msg)
     headers = _extract_all_headers(msg)
 
+    raw_subject = msg.get("Subject")
+    subject_str = _decode_header_value(str(raw_subject)) if raw_subject is not None else ""
+
     parsed = ParsedEmail(
         raw_sha256=raw_sha256,
         raw_size=len(raw_bytes),
-        subject=_decode_header_value(msg.get("Subject") or ""),
-        sender=sender_addr,
-        sender_name=sender_name or None,
-        reply_to=msg.get("Reply-To"),
-        to=_parse_recipients(msg.get("To")),
-        cc=_parse_recipients(msg.get("Cc")),
-        message_id=msg.get("Message-ID"),
+        subject=_sanitize_for_db(subject_str) or "",
+        sender=_sanitize_for_db(sender_addr),
+        sender_name=_sanitize_for_db(sender_name) or None,
+        reply_to=_safe_header_value(msg.get("Reply-To")) or None,
+        to=_parse_recipients(_safe_header_value(msg.get("To"))),
+        cc=_parse_recipients(_safe_header_value(msg.get("Cc"))),
+        message_id=_safe_header_value(msg.get("Message-ID")) or None,
         date=date_value,
-        body_text=body_text,
-        body_html=body_html,
+        body_text=_sanitize_for_db(body_text),
+        body_html=_sanitize_for_db(body_html),
         headers=headers,
         attachments=attachments,
     )

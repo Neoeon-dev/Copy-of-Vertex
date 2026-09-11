@@ -9,13 +9,13 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
 from ..models import Attachment as AttachmentModel
-from ..models import Email, EmailHeader
+from ..models import Email, EmailHeader, EmailRawPayload
 from ..parsers.mime_parser import parse_email
 from ..schemas.email import EmailDetail, EmailSummary
 
@@ -53,11 +53,13 @@ def _validate_upload(file: UploadFile) -> None:
 def _persist_parsed(
     db: Session,
     parsed,
+    raw_bytes: bytes,
     filename: str | None,
 ) -> Email:
     """Write the parsed email and its children to the database.
 
-    The evidence SHA-256 was already computed by the parser on the raw bytes.
+    Preserves the exact uploaded raw bytes in EmailRawPayload without any
+    mutation, line ending transformation, or re-encoding.
     """
     email_record = Email(
         sha256=parsed.raw_sha256,
@@ -76,6 +78,14 @@ def _persist_parsed(
     )
     db.add(email_record)
     db.flush()  # get the auto-generated id
+
+    # Store pristine raw .eml evidence payload
+    raw_payload = EmailRawPayload(
+        email_id=email_record.id,
+        sha256=parsed.raw_sha256,
+        raw_bytes=raw_bytes,
+    )
+    db.add(raw_payload)
 
     # Persist every header in original order
     for h in parsed.headers:
@@ -120,7 +130,7 @@ async def analyze_email(
     2. Read raw bytes
     3. Compute SHA-256 evidence hash on raw bytes BEFORE parsing
     4. Parse MIME: extract headers, body, attachments
-    5. Persist to database
+    5. Persist to database (including pristine raw evidence bytes)
     6. Return structured analysis response
     """
     _validate_upload(file)
@@ -130,7 +140,7 @@ async def analyze_email(
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     parsed = parse_email(raw_bytes)
-    record = _persist_parsed(db, parsed, file.filename)
+    record = _persist_parsed(db, parsed, raw_bytes, file.filename)
 
     logger.info(
         "Email ingested: id=%d sha256=%s…", record.id, record.sha256[:12]
@@ -165,3 +175,26 @@ def get_email(
     if email_record is None:
         raise HTTPException(status_code=404, detail="Email not found.")
     return email_record
+
+
+@router.get("/{email_id}/raw")
+def get_raw_email(
+    email_id: int,
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Retrieve the pristine, unmodified raw .eml evidence payload bytes."""
+    payload = db.query(EmailRawPayload).filter(EmailRawPayload.email_id == email_id).first()
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Raw evidence payload not found for this email.")
+
+    email_record = db.query(Email).filter(Email.id == email_id).first()
+    filename = (email_record.filename if email_record else None) or f"evidence_{email_id}.eml"
+    return Response(
+        content=payload.raw_bytes,
+        media_type="message/rfc822",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Evidence-SHA256": payload.sha256,
+        },
+    )
+

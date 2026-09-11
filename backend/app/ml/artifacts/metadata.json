@@ -1,0 +1,387 @@
+{
+  "model_version": "1.0.0",
+  "date_trained": "2026-09-06T14:23:06Z",
+  "champion_model": "LightGBM",
+  "class_weight_strategy": "balanced",
+  "best_iteration": 600,
+  "calibration_method": "uncalibrated",
+  "calibration_rationale": "Selected uncalibrated with Brier Score=0.1356 and ECE=0.017 (Macro F1: 0.9006).",
+  "input_features_count": 125,
+  "target_classes": [
+    "legitimate",
+    "spam",
+    "phishing"
+  ],
+  "validation_metrics": {
+    "accuracy": 0.909,
+    "macro_precision": 0.8951,
+    "macro_recall": 0.907,
+    "macro_f1": 0.9006,
+    "weighted_precision": 0.9109,
+    "weighted_recall": 0.909,
+    "weighted_f1": 0.9095,
+    "brier_score": 0.1356,
+    "log_loss": 0.2477,
+    "expected_calibration_error": 0.017,
+    "roc_auc_macro": 0.9817,
+    "pr_auc_macro": 0.9618,
+    "per_class": {
+      "legitimate": {
+        "precision": 0.9532,
+        "recall": 0.9148,
+        "f1": 0.9336,
+        "support": 3499
+      },
+      "spam": {
+        "precision": 0.8746,
+        "recall": 0.8964,
+        "f1": 0.8854,
+        "support": 1689
+      },
+      "phishing": {
+        "precision": 0.8575,
+        "recall": 0.9096,
+        "f1": 0.8828,
+        "support": 1627
+      }
+    },
+    "pr_auc_per_class": {
+      "legitimate": 0.9833,
+      "spam": 0.954,
+      "phishing": 0.948
+    },
+    "roc_auc_per_class": {
+      "legitimate": 0.9834,
+      "spam": 0.9785,
+      "phishing": 0.9832
+    },
+    "phishing_focus": {
+      "precision": 0.8575,
+      "recall": 0.9096,
+      "f1": 0.8828,
+      "pr_auc": 0.948,
+      "roc_auc": 0.9832,
+      "support": 1627
+    },
+    "confusion_matrix": {
+      "classes": [
+        "legitimate",
+        "spam",
+        "phishing"
+      ],
+      "counts": [
+        [
+          3201,
+          148,
+          150
+        ],
+        [
+          79,
+          1514,
+          96
+        ],
+        [
+          78,
+          69,
+          1480
+        ]
+      ],
+      "normalized": [
+        [
+          0.9148,
+          0.0423,
+          0.0429
+        ],
+        [
+          0.0468,
+          0.8964,
+          0.0568
+        ],
+        [
+          0.0479,
+          0.0424,
+          0.9096
+        ]
+      ]
+    }
+  },
+  "test_metrics": {
+    "accuracy": 0.9202,
+    "macro_precision": 0.9108,
+    "macro_recall": 0.9142,
+    "macro_f1": 0.9124,
+    "weighted_precision": 0.9205,
+    "weighted_recall": 0.9202,
+    "weighted_f1": 0.9203,
+    "brier_score": 0.1233,
+    "log_loss": 0.2255,
+    "expected_calibration_error": 0.0249,
+    "roc_auc_macro": 0.9852,
+    "pr_auc_macro": 0.9695,
+    "per_class": {
+      "legitimate": {
+        "precision": 0.9467,
+        "recall": 0.9362,
+        "f1": 0.9414,
+        "support": 2334
+      },
+      "spam": {
+        "precision": 0.8934,
+        "recall": 0.9077,
+        "f1": 0.9005,
+        "support": 1127
+      },
+      "phishing": {
+        "precision": 0.8921,
+        "recall": 0.8987,
+        "f1": 0.8954,
+        "support": 1086
+      }
+    },
+    "pr_auc_per_class": {
+      "legitimate": 0.9867,
+      "spam": 0.9611,
+      "phishing": 0.9608
+    },
+    "roc_auc_per_class": {
+      "legitimate": 0.9858,
+      "spam": 0.9835,
+      "phishing": 0.9863
+    },
+    "phishing_focus": {
+      "precision": 0.8921,
+      "recall": 0.8987,
+      "f1": 0.8954,
+      "pr_auc": 0.9608,
+      "roc_auc": 0.9863,
+      "support": 1086
+    },
+    "confusion_matrix": {
+      "classes": [
+        "legitimate",
+        "spam",
+        "phishing"
+      ],
+      "counts": [
+        [
+          2185,
+          76,
+          73
+        ],
+        [
+          59,
+          1023,
+          45
+        ],
+        [
+          64,
+          46,
+          976
+        ]
+      ],
+      "normalized": [
+        [
+          0.9362,
+          0.0326,
+          0.0313
+        ],
+        [
+          0.0524,
+          0.9077,
+          0.0399
+        ],
+        [
+          0.0589,
+          0.0424,
+          0.8987
+        ]
+      ]
+    }
+  },
+  "holdout_metrics": {
+    "accuracy": 0.404,
+    "macro_precision": 0.2235,
+    "macro_recall": 0.404,
+    "macro_f1": 0.2877,
+    "weighted_precision": 0.2235,
+    "weighted_recall": 0.404,
+    "weighted_f1": 0.2877,
+    "brier_score": 0.5252,
+    "log_loss": 0.7481,
+    "expected_calibration_error": 0.2154,
+    "roc_auc_macro": NaN,
+    "pr_auc_macro": 0.5434,
+    "per_class": {
+      "legitimate": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 1000
+      },
+      "spam": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 0
+      },
+      "phishing": {
+        "precision": 0.4469,
+        "recall": 0.808,
+        "f1": 0.5755,
+        "support": 1000
+      }
+    },
+    "pr_auc_per_class": {
+      "legitimate": 0.4417,
+      "spam": 0.5,
+      "phishing": 0.6885
+    },
+    "roc_auc_per_class": {
+      "legitimate": 0.4836,
+      "spam": NaN,
+      "phishing": 0.5609
+    },
+    "phishing_focus": {
+      "precision": 0.4469,
+      "recall": 0.808,
+      "f1": 0.5755,
+      "pr_auc": 0.6885,
+      "roc_auc": 0.5609,
+      "support": 1000
+    },
+    "confusion_matrix": {
+      "classes": [
+        "legitimate",
+        "spam",
+        "phishing"
+      ],
+      "counts": [
+        [
+          0,
+          0,
+          1000
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          192,
+          0,
+          808
+        ]
+      ],
+      "normalized": [
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.192,
+          0.0,
+          0.808
+        ]
+      ]
+    }
+  },
+  "baseline_logistic_val_metrics": {
+    "accuracy": 0.6996,
+    "macro_precision": 0.6679,
+    "macro_recall": 0.6375,
+    "macro_f1": 0.6474,
+    "weighted_precision": 0.6902,
+    "weighted_recall": 0.6996,
+    "weighted_f1": 0.69,
+    "brier_score": 0.39629998803138733,
+    "log_loss": 0.682,
+    "expected_calibration_error": 0.0274,
+    "roc_auc_macro": 0.861,
+    "pr_auc_macro": 0.7313,
+    "per_class": {
+      "legitimate": {
+        "precision": 0.751,
+        "recall": 0.8662,
+        "f1": 0.8045,
+        "support": 3499
+      },
+      "spam": {
+        "precision": 0.6146,
+        "recall": 0.5619,
+        "f1": 0.5871,
+        "support": 1689
+      },
+      "phishing": {
+        "precision": 0.6381,
+        "recall": 0.4843,
+        "f1": 0.5507,
+        "support": 1627
+      }
+    },
+    "pr_auc_per_class": {
+      "legitimate": 0.873,
+      "spam": 0.6696,
+      "phishing": 0.6514
+    },
+    "roc_auc_per_class": {
+      "legitimate": 0.8742,
+      "spam": 0.8493,
+      "phishing": 0.8596
+    },
+    "phishing_focus": {
+      "precision": 0.6381,
+      "recall": 0.4843,
+      "f1": 0.5507,
+      "pr_auc": 0.6514,
+      "roc_auc": 0.8596,
+      "support": 1627
+    },
+    "confusion_matrix": {
+      "classes": [
+        "legitimate",
+        "spam",
+        "phishing"
+      ],
+      "counts": [
+        [
+          3031,
+          214,
+          254
+        ],
+        [
+          547,
+          949,
+          193
+        ],
+        [
+          458,
+          381,
+          788
+        ]
+      ],
+      "normalized": [
+        [
+          0.8662,
+          0.0612,
+          0.0726
+        ],
+        [
+          0.3239,
+          0.5619,
+          0.1143
+        ],
+        [
+          0.2815,
+          0.2342,
+          0.4843
+        ]
+      ]
+    }
+  }
+}

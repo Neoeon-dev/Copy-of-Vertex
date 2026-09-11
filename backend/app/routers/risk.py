@@ -17,18 +17,32 @@ from ..forensics.attachment_analyzer import analyze_attachments
 from ..forensics.domain_intel import analyze_domain, extract_domains_from_headers
 from ..forensics.ip_intelligence import analyze_ips, extract_ips_from_headers
 from ..forensics.received_analyzer import parse_received_headers
-from ..forensics.risk_engine import RiskAssessment, get_risk_engine
+from ..engine import get_canonical_risk_engine
 from ..forensics.spf_analyzer import analyze_spf
 from ..forensics.dkim_analyzer import analyze_dkim
-from ..forensics.dmarc_analyzer import analyze_dmarc
+from ..forensics.dmarc_analyzer import analyze_dmarc, extract_domain_from_address
 from ..forensics.url_analyzer import analyze_urls, extract_urls_from_email
 from ..ml.classifier import get_classifier
 from ..models import Email
 from ..utils import get_headers_dict
+from ..engine.response_policy import evaluate_risk_assessment
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/emails", tags=["risk"])
+
+
+class ResponseRecommendationOut(BaseModel):
+    recommended_action: str
+    approval_required: bool
+    reversible: bool
+    rationale: str
+    severity: str
+    risk_score: float
+    confidence: float
+    uncertainty: float
+    evidence_quality: str
+    policy_version: str = "5.1.0"
 
 
 class SignalContributionOut(BaseModel):
@@ -50,14 +64,34 @@ class RiskAssessmentOut(BaseModel):
     summary: str = ""
     limitations: list[str] = Field(default_factory=list)
 
+    # Canonical Phase D5 fields
+    risk_score: float | None = None
+    severity: str | None = None
+    threat_probabilities: dict[str, float] = Field(default_factory=dict)
+    predicted_threat_label: str | None = None
+    confidence: float | None = None
+    uncertainty: float | None = None
+    evidence_quality: dict[str, Any] | None = None
+    model_evidence: dict[str, Any] | None = None
+    category_caps: dict[str, float] = Field(default_factory=dict)
+    risk_factors: list[dict[str, Any]] = Field(default_factory=list)
+    explanation: str = ""
+    engine_version: str = "5.0.0"
+    feature_version: str = "1.0.0"
+    rule_set_version: str = "2026.1"
+
+    # D5.1 Response Policy fields
+    response_recommendation: ResponseRecommendationOut | None = None
+
 
 def _run_risk_assessment(email_id: int, email_record: Email) -> RiskAssessmentOut:
     """Run the complete risk assessment pipeline."""
     headers = get_headers_dict(email_record.headers)
-    from_domain = email_record.sender
+    from_domain = extract_domain_from_address(email_record.sender) if email_record.sender else None
+    raw_bytes = email_record.raw_payload.raw_bytes if hasattr(email_record, "raw_payload") and email_record.raw_payload else None
 
     spf = analyze_spf(headers=headers, email_sender_domain=from_domain)
-    dkim_results = analyze_dkim(headers=headers, raw_email_bytes=None, email_sender_domain=from_domain)
+    dkim_results = analyze_dkim(headers=headers, raw_email_bytes=raw_bytes, email_sender_domain=from_domain)
     dkim_first = dkim_results[0] if dkim_results else None
     spf_envelope = spf.domain if spf.domain != from_domain else None
     dmarc = analyze_dmarc(
@@ -81,7 +115,7 @@ def _run_risk_assessment(email_id: int, email_record: Email) -> RiskAssessmentOu
         spf_result=spf.result, dkim_result=dkim_first.result if dkim_first else None,
     )
 
-    engine = get_risk_engine()
+    engine = get_canonical_risk_engine()
     assessment = engine.assess(
         ml_label=ml_result.label, ml_confidence=ml_result.confidence, ml_risk_score=ml_result.risk_score,
         ml_signals=ml_result.signals, ml_signal_details=ml_result.signal_details,
@@ -90,9 +124,28 @@ def _run_risk_assessment(email_id: int, email_record: Email) -> RiskAssessmentOu
         sender=email_record.sender, sender_name=email_record.sender_name, reply_to=email_record.reply_to,
         domain_analyses=domain_analyses, url_analyses=url_analyses, attachment_analyses=att_analyses,
         received_anomalies=received.anomalies, total_hops=received.total_hops, ip_analyses=[ia.to_dict() for ia in ip_analyses],
+        subject=email_record.subject, body=email_record.body_text or email_record.body_html,
     )
 
-    return RiskAssessmentOut(email_id=email_id, **assessment.to_dict())
+    # D5.1: Generate response policy recommendation
+    recommendation = evaluate_risk_assessment(assessment)
+
+    return RiskAssessmentOut(
+        email_id=email_id,
+        **assessment.to_dict(),
+        response_recommendation=ResponseRecommendationOut(
+            recommended_action=recommendation.recommended_action.value,
+            approval_required=recommendation.approval_required,
+            reversible=recommendation.reversible,
+            rationale=recommendation.rationale,
+            severity=recommendation.severity,
+            risk_score=recommendation.risk_score,
+            confidence=recommendation.confidence,
+            uncertainty=recommendation.uncertainty,
+            evidence_quality=recommendation.evidence_quality,
+            policy_version=recommendation.policy_version.value,
+        ),
+    )
 
 
 @router.post("/{email_id}/risk", response_model=RiskAssessmentOut)

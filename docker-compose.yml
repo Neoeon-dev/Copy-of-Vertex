@@ -41,10 +41,12 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
 
 volumes:
   pgdata:

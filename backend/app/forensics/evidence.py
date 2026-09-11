@@ -151,6 +151,10 @@ def verify_chain_integrity(
 ) -> tuple[bool, list[str]]:
     """Verify the integrity of the evidence hash chain.
 
+    Recomputes content_hash from the underlying action and evidence fields,
+    and chain_hash from the content_hash and previous_hash link, detecting
+    any tampering with stored evidence rows.
+
     Returns:
         (is_valid, list_of_errors)
     """
@@ -163,6 +167,21 @@ def verify_chain_integrity(
     prev_hash: str | None = None
 
     for entry in entries:
+        # Recompute expected content hash from underlying record data
+        content_data = json.dumps({
+            "email_id": entry.email_id,
+            "evidence_id": entry.evidence_id,
+            "action": entry.action,
+            "details": entry.details,
+        }, sort_keys=True)
+        expected_content_hash = _sha256(content_data)
+
+        if entry.content_hash != expected_content_hash:
+            errors.append(
+                f"Entry {entry.id}: content_hash mismatch "
+                f"(expected={expected_content_hash[:12]}, got={entry.content_hash[:12]})"
+            )
+
         # Verify previous hash link
         if entry.previous_hash != prev_hash:
             errors.append(
@@ -170,8 +189,8 @@ def verify_chain_integrity(
                 f"(expected={prev_hash}, got={entry.previous_hash})"
             )
 
-        # Verify chain hash
-        expected_chain = compute_chain_hash(entry.content_hash, entry.previous_hash)
+        # Verify chain hash using recomputed expected content hash
+        expected_chain = compute_chain_hash(expected_content_hash, entry.previous_hash)
         if entry.chain_hash != expected_chain:
             errors.append(
                 f"Entry {entry.id}: chain_hash mismatch "
@@ -184,16 +203,40 @@ def verify_chain_integrity(
 
 
 def verify_audit_log_integrity(db: Session) -> tuple[bool, list[str]]:
-    """Verify the integrity of the audit log chain."""
+    """Verify the integrity of the audit log chain.
+
+    Recomputes entry_hash from all recorded audit fields to ensure the log
+    has not been tampered with or modified.
+    """
     entries = db.query(AuditLog).order_by(AuditLog.id.asc()).all()
     errors: list[str] = []
     prev_hash: str | None = None
 
     for entry in entries:
+        # Verify previous hash link
         if entry.previous_hash != prev_hash:
             errors.append(
-                f"Audit entry {entry.id}: previous_hash mismatch"
+                f"Audit entry {entry.id}: previous_hash mismatch "
+                f"(expected={prev_hash}, got={entry.previous_hash})"
             )
+
+        # Recompute expected entry hash from all fields
+        entry_data = json.dumps({
+            "action": entry.action,
+            "entity_type": entry.entity_type,
+            "entity_id": entry.entity_id,
+            "actor": entry.actor,
+            "details": entry.details,
+            "previous_hash": entry.previous_hash,
+        }, sort_keys=True)
+        expected_entry_hash = _sha256(entry_data)
+
+        if entry.entry_hash != expected_entry_hash:
+            errors.append(
+                f"Audit entry {entry.id}: entry_hash mismatch "
+                f"(expected={expected_entry_hash[:12]}, got={entry.entry_hash[:12]})"
+            )
+
         prev_hash = entry.entry_hash
 
     return len(errors) == 0, errors

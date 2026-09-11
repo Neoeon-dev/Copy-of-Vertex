@@ -48,5 +48,6 @@ def init_db() -> None:
     """
     # Import models so SQLAlchemy registers all tables in the metadata.
     from . import models  # noqa: F401
+    from .threat_intel import models as threat_intel_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

@@ -70,28 +70,28 @@ export default function EmailDetailPage() {
 
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
-        <Card className="p-6 sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="pb-1">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <div className="text-[10px] font-black uppercase tracking-[.16em] text-primary">Analyst readout</div>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.025em]">{analysis || risk ? analystHeadline(level, ml?.label) : 'Turn the forensic signals into a clear investigation'}</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">{analysis || risk ? analystSummary(level, ml?.label, auth, analysis, ipIntel) : 'Run the analysis once to turn authentication, routing, links, domains, attachments, model output and IP intelligence into a human-readable investigation.'}</p>
+              <div className="text-[10px] font-black uppercase tracking-[.16em] text-text-tertiary">Assessment</div>
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.025em]">{analysis || risk ? analystHeadline(level, ml?.label) : 'Run analysis to assess this message'}</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">{analysis || risk ? analystSummary(level, ml?.label, auth, analysis, ipIntel) : 'Authentication, routing, links, domains, attachments, classification and IP context will appear here.'}</p>
             </div>
             <Button onClick={runAnalysis} disabled={running} busy={running} className="shrink-0"><Activity size={15}/>{running ? 'Running analysis…' : analysis ? 'Re-run analysis' : 'Run full analysis'}</Button>
           </div>
-          {(analysis || risk) ? <div className="mt-8 grid gap-3 md:grid-cols-3">
+          {(analysis || risk) ? <div className="mt-7 grid gap-0 overflow-hidden rounded-2xl border border-border bg-surface md:grid-cols-3">
             <Readout item="Sender" value={authVerdict(auth)} tone={authTone(auth)} />
             <Readout item="Threat pattern" value={threatPattern(ml, risk)} tone={riskTone(level)} />
             <Readout item="Infrastructure" value={infrastructureSummary(analysis, ipIntel)} tone="info" />
           </div> : null}
-        </Card>
+        </div>
 
         {risk || analysis ? <>
           <Card className="overflow-hidden p-5 sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
               <RiskGauge score={score ?? 0} level={level}/>
               <div>
-                <div className="flex flex-wrap items-center gap-2"><Badge tone={riskTone(level)}>{level}</Badge>{ml ? <span className="text-xs font-semibold text-text-secondary">Classifier: {ml.label} · {Math.round(ml.confidence * 100)}% confidence</span> : null}</div>
+                <div className="flex flex-wrap items-center gap-2"><Badge tone={riskTone(level)}>{level}</Badge>{ml ? <span className="text-xs font-semibold text-text-secondary">Forensic model: {ml.label} · {Math.round(ml.confidence * 100)}% confidence</span> : null}</div>
                 {risk?.summary ? <p className="mt-3 text-sm leading-6 text-text-secondary">{risk.summary}</p> : null}
                 <RiskCategoryChart rows={categoryRows}/>
               </div>
@@ -102,7 +102,7 @@ export default function EmailDetailPage() {
             {ml ? <ProbabilityChart ml={ml}/> : <Card className="p-5"><SectionHeading icon={ShieldAlert} title="Model classification"/><p className="mt-4 text-sm text-text-secondary">Run the full analysis to populate the classifier probabilities and signal breakdown.</p></Card>}
             {analysis ? <IndicatorChart analysis={analysis} email={email}/> : <Card className="p-5"><SectionHeading icon={Server} title="Forensic indicators"/><p className="mt-4 text-sm text-text-secondary">The graph fills after the full forensic pipeline returns.</p></Card>}
           </div>
-        </> : <Card className="p-6"><div className="flex items-start gap-3"><ShieldAlert size={18} className="mt-0.5 text-text-secondary"/><div><div className="text-sm font-bold">Risk has not been assessed yet</div><div className="mt-1 text-sm leading-6 text-text-secondary">Run the full analysis to calculate the weighted 0–100 score and the explainable signal breakdown.</div></div></div></Card>}
+        </> : <Card className="p-6"><div className="flex items-start gap-3"><ShieldAlert size={18} className="mt-0.5 text-text-secondary"/><div><div className="text-sm font-bold">Risk has not been assessed yet</div><div className="mt-1 text-sm leading-6 text-text-secondary">Run the full analysis to calculate the weighted 0–100 risk score and inspect the signal breakdown.</div></div></div></Card>}
 
         <div className="grid gap-5 md:grid-cols-2"><AuthCard auth={auth}/><Card className="p-5"><SectionHeading icon={Mail} title="Message metadata"/><div className="mt-4 space-y-3"><Row label="From" value={email.sender}/><Row label="Display name" value={email.sender_name}/><Row label="Reply-To" value={email.reply_to}/><Row label="To" value={email.to.map((x) => x.address || x.name).filter(Boolean).join(', ') || '—'}/><Row label="Date" value={formatDate(email.date)}/><Row label="Message-ID" value={email.message_id}/></div></Card></div>
 
@@ -179,15 +179,15 @@ function infrastructureSummary(analysis: FullAnalysis | null, ipIntel: IPAnalysi
 }
 
 function Readout({ item, value, tone }: { item: string; value: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }) {
-  return <div className="rounded-2xl border border-border bg-surface-soft px-4 py-4"><div className="text-[10px] font-black uppercase tracking-[.12em] text-text-tertiary">{item}</div><div className="mt-2 flex items-start gap-2"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warning' ? 'bg-warning' : tone === 'success' ? 'bg-success' : tone === 'info' ? 'bg-info' : 'bg-text-tertiary'}`}/><div className="text-sm font-semibold leading-5">{value}</div></div></div>
+  return <div className="border-b border-border px-4 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0"><div className="text-[10px] font-black uppercase tracking-[.12em] text-text-tertiary">{item}</div><div className="mt-2 flex items-start gap-2"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tone === 'danger' ? 'bg-danger' : tone === 'warning' ? 'bg-warning' : tone === 'success' ? 'bg-success' : tone === 'info' ? 'bg-info' : 'bg-text-tertiary'}`}/><div className="text-sm font-semibold leading-5">{value}</div></div></div>
 }
 
 function GeoNetworkPanel({ intel }: { intel: IPAnalysis | null }) {
   const publicIps = intel?.ips.filter((ip) => ip.is_public) ?? []
   const mapped = publicIps.filter((ip) => ip.geo?.latitude != null && ip.geo?.longitude != null)
   const withNetwork = publicIps.filter((ip) => ip.asn?.asn != null)
-  if (!intel) return <Card className="p-6"><SectionHeading icon={MapPinned} title="Geographic & network intelligence"/><p className="mt-3 text-sm text-text-secondary">IP enrichment appears after the forensic analysis runs.</p></Card>
-  return <Card className="overflow-hidden p-0"><div className="p-6 sm:p-7"><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><SectionHeading icon={MapPinned} title="Geographic & network intelligence"/><p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">Approximate infrastructure context for public IPs observed in the message. This is intelligence about the network, not proof of an attacker’s physical location.</p></div><Badge tone="info">{publicIps.length} public IP{publicIps.length === 1 ? '' : 's'}</Badge></div>
+  if (!intel) return <Card className="p-6"><SectionHeading icon={MapPinned} title="Network & location"/><p className="mt-3 text-sm text-text-secondary">IP enrichment appears after the forensic analysis runs.</p></Card>
+  return <Card className="overflow-hidden p-0"><div className="p-6 sm:p-7"><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><SectionHeading icon={MapPinned} title="Network & location"/><p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">Approximate location and network details for public IPs observed in the message. Location data is approximate and is not proof of an attacker’s physical location.</p></div><Badge tone="info">{publicIps.length} public IP{publicIps.length === 1 ? '' : 's'}</Badge></div>
 <div className="mt-7 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
 <div className="rounded-2xl border border-border bg-slate-950 p-4 text-white dark:bg-[#0b1220]"><div className="mb-3 flex items-center justify-between"><span className="text-xs font-black uppercase tracking-[.12em] text-slate-300">Approximate network map</span><span className="text-[10px] text-slate-400">{mapped.length} mapped</span></div><GeoMap points={mapped}/></div>
 <div className="space-y-3">{publicIps.map((ip) => <GeoIntelRow key={ip.ip} intel={ip}/>)}{!publicIps.length ? <div className="rounded-2xl border border-dashed border-border p-5 text-sm text-text-tertiary">No public IPs were returned by the analysis.</div> : null}</div>
@@ -224,7 +224,22 @@ function RiskCategoryChart({ rows }: { rows: [string, number][] }) {
 
 function ProbabilityChart({ ml }: { ml: MLClassification }) {
   const rows = Object.entries(ml.probabilities).sort((a, b) => Number(b[1]) - Number(a[1]))
-  return <Card className="p-5"><SectionHeading icon={Activity} title="Model probabilities"/><p className="mt-1 text-xs text-text-secondary">Classification confidence returned by the backend model.</p><div className="mt-5 space-y-3">{rows.slice(0, 5).map(([label, value]) => <div key={label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{humanize(label)}</span><span className="font-mono text-text-tertiary">{Math.round(value * 100)}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.round(value * 100)}%`}} className="h-full rounded-full bg-primary"/></div></div>)}</div></Card>
+  const features = ml.top_features.slice(0, 6)
+  const maxGain = Math.max(...features.map((item) => item.importance_gain), 1)
+  return <div className="space-y-5">
+    <Card className="p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div><SectionHeading icon={Activity} title="Classification"/><p className="mt-1 text-xs text-text-secondary">Prediction from the forensic model using the extracted email evidence.</p></div>
+        <div className="rounded-xl bg-surface-soft px-3 py-2 text-right"><div className="text-[10px] font-black uppercase tracking-wider text-text-tertiary">Model</div><div className="mt-0.5 text-xs font-bold">{ml.model_version} · {ml.feature_count} features</div><div className="mt-0.5 text-[10px] text-text-tertiary">{ml.latency_ms.toFixed(0)} ms · {humanize(ml.calibration_method)}</div></div>
+      </div>
+      <div className="mt-5 space-y-3">{rows.slice(0, 5).map(([label, value]) => <div key={label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{humanize(label)}</span><span className="font-mono text-text-tertiary">{Math.round(value * 100)}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.round(value * 100)}%`}} className="h-full rounded-full bg-primary"/></div></div>)}</div>
+    </Card>
+    {features.length ? <Card className="p-5">
+      <SectionHeading icon={ShieldCheck} title="Most influential signals"/>
+      <p className="mt-1 text-xs text-text-secondary">Features with the highest model importance that were active for this message.</p>
+      <div className="mt-5 space-y-3">{features.map((item) => <div key={item.feature}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="min-w-0 font-semibold">{humanize(item.feature)}</span><span className="shrink-0 font-mono text-[10px] text-text-tertiary">{item.value}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.max(4, item.importance_gain / maxGain * 100)}%`}} className="h-full rounded-full bg-slate-900 dark:bg-white"/></div></div>)}</div>
+    </Card> : null}
+  </div>
 }
 
 function IndicatorChart({ analysis, email }: { analysis: FullAnalysis; email: EmailDetail }) {
@@ -235,12 +250,12 @@ function IndicatorChart({ analysis, email }: { analysis: FullAnalysis; email: Em
     { label:'URLs', value:analysis.total_urls, max:Math.max(1, analysis.domain_analysis.length, analysis.total_urls), tone:'bg-amber-500' },
     { label:'Attachments', value:email.attachments.length, max:Math.max(1, email.attachments.length, analysis.total_urls), tone:'bg-rose-500' },
   ]
-  return <Card className="p-5"><SectionHeading icon={Server} title="Forensic indicator volume"/><p className="mt-1 text-xs text-text-secondary">Count of indicators returned by each analysis module.</p><div className="mt-5 space-y-3">{points.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{item.label}</span><span className="font-mono text-text-tertiary">{item.value}</span></div><div className="h-3 overflow-hidden rounded-full bg-surface-soft"><div className={`h-full rounded-full ${item.tone}`} style={{width:`${Math.min(100, item.value / item.max * 100)}%`}}/></div></div>)}</div></Card>
+  return <Card className="p-5"><SectionHeading icon={Server} title="Indicators found"/><div className="mt-5 space-y-3">{points.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{item.label}</span><span className="font-mono text-text-tertiary">{item.value}</span></div><div className="h-3 overflow-hidden rounded-full bg-surface-soft"><div className={`h-full rounded-full ${item.tone}`} style={{width:`${Math.min(100, item.value / item.max * 100)}%`}}/></div></div>)}</div></Card>
 }
 
 function SignalContributionChart({ items }: { items: RiskAssessment['contributions'] }) {
   const max = Math.max(...items.map((item) => item.contribution), 1)
-  return <Card className="p-5"><SectionHeading icon={ShieldCheck} title="Top contributing signals"/><p className="mt-1 text-xs text-text-secondary">The same explainable signal values are visualized here instead of a plain list.</p><div className="mt-5 space-y-3">{items.map((item, index) => <div key={`${item.signal}-${index}`}><div className="mb-1 flex items-start justify-between gap-3 text-xs"><div className="min-w-0"><div className="font-semibold">{humanize(item.signal)}</div><div className="mt-0.5 truncate text-[10px] text-text-tertiary">{item.description}</div></div><span className="shrink-0 rounded-full bg-surface-soft px-2 py-1 font-mono text-[10px] font-bold">+{item.contribution.toFixed(1)}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${item.contribution / max * 100}%`}} className="h-full rounded-full bg-slate-950 dark:bg-white"/></div></div>)}</div></Card>
+  return <Card className="p-5"><SectionHeading icon={ShieldCheck} title="Main risk factors"/><div className="mt-5 space-y-3">{items.map((item, index) => <div key={`${item.signal}-${index}`}><div className="mb-1 flex items-start justify-between gap-3 text-xs"><div className="min-w-0"><div className="font-semibold">{humanize(item.signal)}</div><div className="mt-0.5 truncate text-[10px] text-text-tertiary">{item.description}</div></div><span className="shrink-0 rounded-full bg-surface-soft px-2 py-1 font-mono text-[10px] font-bold">+{item.contribution.toFixed(1)}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${item.contribution / max * 100}%`}} className="h-full rounded-full bg-slate-950 dark:bg-white"/></div></div>)}</div></Card>
 }
 
 function InvestigationTimeline({ email, auth, analysis, risk, verification }: { email: EmailDetail; auth: AuthenticationSummary | null; analysis: FullAnalysis | null; risk: RiskAssessment | null; verification: Awaited<ReturnType<typeof verifyEvidence>> | null }) {
@@ -248,7 +263,7 @@ function InvestigationTimeline({ email, auth, analysis, risk, verification }: { 
     { title:'Evidence ingested', text:`Email #${email.id} stored with SHA-256 evidence identity.`, done:true },
     { title:'Authentication', text:'SPF, DKIM and DMARC response available.', done:Boolean(auth) },
     { title:'Forensic analysis', text:'Headers, routing, URLs, domains and attachments analyzed.', done:Boolean(analysis) },
-    { title:'Risk assessment', text:'Weighted model and explainable contributions calculated.', done:Boolean(risk) },
+    { title:'Risk score', text:'Weighted risk score and contributing factors calculated.', done:Boolean(risk) },
     { title:'Evidence verification', text:verification ? verification.valid ? 'Integrity chain verified.' : 'Integrity verification returned a warning.' : 'Run verification when you need to validate the stored evidence chain.', done:verification?.valid ?? false },
   ]
   return <Card className="p-5"><SectionHeading icon={Waypoints} title="Investigation timeline"/><div className="mt-5 space-y-4">{items.map((item, index) => <div key={item.title} className="flex gap-3"><div className="flex flex-col items-center"><span className={`grid h-7 w-7 place-items-center rounded-full ${item.done ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'border border-border bg-surface-soft text-text-tertiary'}`}>{item.done ? <CheckCircle2 size={14}/> : <span className="h-2 w-2 rounded-full bg-current"/>}</span>{index < items.length - 1 ? <span className="mt-1 h-8 w-px bg-border"/> : null}</div><div className="pb-1"><div className="text-sm font-bold">{item.title}</div><div className="mt-1 text-xs leading-5 text-text-secondary">{item.text}</div></div></div>)}</div></Card>

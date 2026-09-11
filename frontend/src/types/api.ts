@@ -107,14 +107,24 @@ export type FullAnalysis = {
   overall_risk_score: number
 }
 
+export type MLFeature = {
+  feature: string
+  value: number
+  importance_gain: number
+}
+
 export type MLClassification = {
   email_id: number
   label: string
   confidence: number
   probabilities: Record<string, number>
-  signals: Record<string, number>
-  signal_details: Record<string, string>
   risk_score: number
+  model_version: string
+  model_architecture: string
+  feature_count: number
+  calibration_method: string
+  latency_ms: number
+  top_features: MLFeature[]
 }
 
 export type RiskContribution = {

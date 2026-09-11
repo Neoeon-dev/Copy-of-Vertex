@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..forensics.dkim_analyzer import analyze_dkim
-from ..forensics.dmarc_analyzer import analyze_dmarc
+from ..forensics.dmarc_analyzer import analyze_dmarc, extract_domain_from_address
 from ..forensics.spf_analyzer import analyze_spf
 from ..models import Email, EmailAuthenticationResult
 from ..schemas.email import AuthResultOut, AuthenticationSummary
@@ -28,11 +28,14 @@ router = APIRouter(prefix="/api/emails", tags=["authentication"])
 
 
 def _get_raw_email_bytes(email_record: Email) -> bytes | None:
-    """Reconstruct raw email bytes from stored headers + body for DKIM verification.
+    """Retrieve pristine raw email bytes from EmailRawPayload.
 
-    This is a best-effort reconstruction; the original raw bytes are the
-    evidence hash. We need raw bytes for dkimpy verification.
+    Falls back to header+body reconstruction only for legacy records where
+    raw_payload is missing.
     """
+    if hasattr(email_record, "raw_payload") and email_record.raw_payload is not None:
+        return email_record.raw_payload.raw_bytes
+
     lines: list[str] = []
     for h in email_record.headers:
         lines.append(f"{h.name}: {h.value}")
@@ -59,7 +62,7 @@ def _run_authentication_analysis(
     """Run SPF, DKIM, and DMARC analysis on an email."""
     headers = get_headers_dict(email_record.headers)
     raw_bytes = _get_raw_email_bytes(email_record)
-    from_domain = email_record.sender
+    from_domain = extract_domain_from_address(email_record.sender) if email_record.sender else None
 
     # ── SPF Analysis ──
     spf = analyze_spf(
