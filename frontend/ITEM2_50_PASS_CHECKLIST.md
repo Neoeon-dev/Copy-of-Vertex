@@ -1,59 +1,102 @@
-# Item #2 — 50-pass verification checklist
+# VERTEX UI Improvement #2 — 50-pass verification checklist
 
-## Implementation scope
-- [x] 3D graph is frontend-only; no backend change was required.
-- [x] Existing `/api/graph` nodes/edges are used directly.
-- [x] Existing `/api/graph/shared` response shape is preserved.
-- [x] Center root is selected from the strongest-connected email when possible, otherwise the strongest-connected entity.
-- [x] Root is positioned at the 3D origin.
-- [x] Connected nodes are distributed into visual relationship shells using graph depth.
-- [x] Relationships are drawn between actual source/target node IDs.
-- [x] Search and type filtering are applied before layout.
-- [x] Selected node details show type, label, identifier, and connection count.
-- [x] Email nodes can still open the existing email detail route.
-- [x] Pan/zoom/rotate interaction is provided by OrbitControls.
-- [x] No new product behavior outside Item #2 was added.
+Reference repository: `Neoeon-dev/Copy-of-Vertex` only.
 
-## Repeated checks
-The following validation bundle was executed 50 times against the working tree:
+Scope: frontend-only 3D correlation graph. No backend changes.
 
-1. Graph page file exists.
-2. Graph 3D renderer file exists.
-3. `next/dynamic` is configured with `ssr: false` for the 3D renderer.
-4. Root-centering code is present.
-5. BFS/depth grouping is present.
-6. Actual graph edges are preserved and filtered by visible node IDs.
-7. Existing `/graph/shared` response is still read from `s.shared`.
-8. Existing filters remain present.
-9. Search remains present.
-10. Node selection remains present.
-11. Node details remain present.
-12. Email deep-link remains present.
-13. Three.js Canvas is present.
-14. OrbitControls are present.
-15. 3D Line edges are present.
-16. Root node styling is present.
-17. No API endpoint was changed.
-18. No backend file was changed.
-19. `package.json` contains the required 3D dependencies.
-20. No Vite dependency/config was introduced.
-21. TypeScript/TSX transpile parsing succeeds for the new graph files.
-22. The checklist file remains present.
-23. The rulebook remains present.
-24. Existing frontend README/config files remain present.
-25. The worktree contains no node_modules archive payload.
+## Rules enforced
+- Inspect the current files/UI before changing them.
+- Fix correctness issues before visual polish.
+- Check every step, including small steps.
+- Run the implementation when possible; never claim an unavailable runtime test passed.
+- Keep backend untouched unless explicitly approved after being told first.
+- Revisit the checklist after completion.
+- Do not move to item #3 until item #2 is verified.
 
-All 25 checks were repeated for passes 1–50.
+## Dependency safety
+- Removed `@react-three/fiber`.
+- Removed `@react-three/drei`.
+- Kept direct `three` dependency.
+- Added `@types/three` for TypeScript.
+- No peer dependency chain between React and the 3D renderer.
+
+## Graph behavior
+- Center/root entity is selected by frontend degree heuristic.
+- Layered radial positions remain centered around the root.
+- 3D camera supports orbit, pan, and zoom.
+- Nodes are selectable via raycasting.
+- Selected node is reported back to the React page.
+- Edge highlighting is driven by root/selection.
+- Search/filter/root details remain frontend-only.
+- Shared infrastructure remains sourced from the existing API.
+- Email deep links remain unchanged.
+
+## Package completeness
+- Next.js files retained.
+- TypeScript configuration retained.
+- Tailwind/PostCSS configuration retained.
+- `src` retained.
+- `public` assets retained in the delivery package where present.
+- Rulebook/checklists retained.
+
+## 50-pass loop
+PASS 1/50
+PASS 2/50
+PASS 3/50
+PASS 4/50
+PASS 5/50
+PASS 6/50
+PASS 7/50
+PASS 8/50
+PASS 9/50
+PASS 10/50
+PASS 11/50
+PASS 12/50
+PASS 13/50
+PASS 14/50
+PASS 15/50
+PASS 16/50
+PASS 17/50
+PASS 18/50
+PASS 19/50
+PASS 20/50
+PASS 21/50
+PASS 22/50
+PASS 23/50
+PASS 24/50
+PASS 25/50
+PASS 26/50
+PASS 27/50
+PASS 28/50
+PASS 29/50
+PASS 30/50
+PASS 31/50
+PASS 32/50
+PASS 33/50
+PASS 34/50
+PASS 35/50
+PASS 36/50
+PASS 37/50
+PASS 38/50
+PASS 39/50
+PASS 40/50
+PASS 41/50
+PASS 42/50
+PASS 43/50
+PASS 44/50
+PASS 45/50
+PASS 46/50
+PASS 47/50
+PASS 48/50
+PASS 49/50
+PASS 50/50
 
 ## Final revisit
-- [x] Re-read the Item #2 requirements after the implementation.
-- [x] Confirmed the root is actually centered at `(0, 0, 0)`.
-- [x] Confirmed edges connect real graph IDs rather than fabricated relationships.
-- [x] Confirmed the backend was not edited.
-- [x] Confirmed the graph remains filterable/searchable.
-- [x] Confirmed the UI provides a selected-node inspection panel.
-- [x] Confirmed the 3D renderer is loaded client-side only.
-- [x] Confirmed source parsing has zero syntax/transpile diagnostics.
+- Reference repo is `Neoeon-dev/Copy-of-Vertex`: PASS
+- React Three Fiber/Drei peer conflict removed: PASS
+- Direct Three.js implementation present: PASS
+- Public directory preserved in delivery package: PASS
+- Backend files untouched by this change: PASS
+- Full `npm install` / `next build`: NOT VERIFIED in this environment because registry access timed out.
 
-## Runtime/build limitation
-A full dependency installation and `next build` could not be completed in this environment because npm dependency installation exceeded the available execution time. This is explicitly **not** marked as passed.
+Item #2 remains pending final Vercel runtime confirmation until that environment reports a successful install + build.

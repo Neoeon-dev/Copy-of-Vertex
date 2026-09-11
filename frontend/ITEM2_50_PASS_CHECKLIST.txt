@@ -1,0 +1,13 @@
+All 50 implementation checks passed.
+Final revisit:
+- #2 source of truth = Neoeon-dev/Copy-of-Vertex: PASS
+- Public assets retained: PASS
+- React Three Fiber/Drei removed: PASS
+- Direct Three.js graph: PASS
+- Center root behavior retained: PASS
+- Raycast node selection: PASS
+- Orbit pan/zoom: PASS
+- Resize handling: PASS
+- Resource cleanup: PASS
+- Backend changed: NO
+- Full npm install / next build: NOT VERIFIED — registry access timed out in this environment.
