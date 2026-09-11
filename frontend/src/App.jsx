@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import UploadPage from './pages/UploadPage'
 import EmailListPage from './pages/EmailListPage'
 import EmailDetailPage from './pages/EmailDetailPage'
@@ -8,95 +8,107 @@ import CorrelationGraphPage from './pages/CorrelationGraphPage'
 import AuditTrailPage from './pages/AuditTrailPage'
 import { checkHealth } from './api'
 
-function Sidebar() {
-  const [online, setOnline] = useState(true)
+const navItems = [
+  { to: '/', label: 'Upload', icon: 'upload', end: true },
+  { to: '/emails', label: 'Analyzed Emails', icon: 'mail' },
+  { to: '/cases', label: 'Investigation Cases', icon: 'case' },
+  { to: '/graph', label: 'Threat Correlation', icon: 'graph' },
+  { to: '/audit', label: 'Audit Ledger', icon: 'shield' },
+]
 
-  useEffect(() => {
-    checkHealth()
-      .then(() => setOnline(true))
-      .catch(() => setOnline(false))
-  }, [])
+function Icon({ name, className = 'h-5 w-5' }) {
+  const paths = {
+    upload: 'M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M4 15.5v2.25A2.25 2.25 0 0 0 6.25 20h11.5A2.25 2.25 0 0 0 20 17.75V15.5',
+    mail: 'M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11ZM5 7l6.2 4.3a1.4 1.4 0 0 0 1.6 0L19 7',
+    case: 'M4.5 7.25A2.25 2.25 0 0 1 6.75 5h3l1.5 1.75h6A2.25 2.25 0 0 1 19.5 9v7.75A2.25 2.25 0 0 1 17.25 19h-10A2.25 2.25 0 0 1 5 16.75V9.5',
+    graph: 'M5 18.5 10 13l4 3 5-7M6.5 5.5h-.01M12 10h-.01M18 6h-.01',
+    shield: 'M12 3.75a11 11 0 0 1 7.75 3.05A11.2 11.2 0 0 1 20 10c0 5.5-3.35 9.05-8 10.25C7.35 19.05 4 15.5 4 10a11.2 11.2 0 0 1 .25-3.2A11 11 0 0 1 12 3.75Z',
+    menu: 'M4 7h16M4 12h16M4 17h16',
+    close: 'm6 6 12 12M18 6 6 18',
+  }
+  return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><path strokeLinecap="round" strokeLinejoin="round" d={paths[name]} /></svg>
+}
 
-  const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-primary/10 text-primary font-semibold'
-        : 'text-text-muted hover:bg-surface-alt hover:text-text'
-    }`
-
+function Header() {
+  const location = useLocation()
+  const active = navItems.find((item) => item.end ? location.pathname === item.to : location.pathname.startsWith(item.to))
   return (
-    <aside className="w-64 bg-surface border-r border-border flex flex-col min-h-screen">
-      <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-sm">
-            MT
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-text tracking-tight leading-none">
-              <span className="text-primary">Mail</span>Trace
-            </h1>
-            <p className="text-[10px] text-text-dim uppercase tracking-wider font-semibold mt-1">Forensic Intelligence</p>
-          </div>
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+      <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Forensic workspace</p>
+          <h2 className="truncate text-sm font-semibold text-slate-900 sm:text-base">{active?.label || 'VERTEX'}</h2>
+        </div>
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">SIH 2026</span>
+          <span className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600">VERTEX</span>
         </div>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
-        <NavLink to="/" className={linkClass} end>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-          </svg>
-          Upload Email
-        </NavLink>
-        <NavLink to="/emails" className={linkClass}>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-          Analyzed Emails
-        </NavLink>
-        <NavLink to="/cases" className={linkClass}>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z" />
-          </svg>
-          Investigation Cases
-        </NavLink>
-        <NavLink to="/graph" className={linkClass}>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-          </svg>
-          Threat Correlation
-        </NavLink>
-        <NavLink to="/audit" className={linkClass}>
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-          </svg>
-          Audit Ledger
-        </NavLink>
-      </nav>
-      <div className="p-4 border-t border-border space-y-2">
-        <div className="flex items-center justify-between text-xs text-text-dim px-2">
-          <span>Backend</span>
-          <span className="flex items-center gap-1.5 font-medium text-text">
-            <span className={`w-2 h-2 rounded-full ${online ? 'bg-success' : 'bg-danger'}`}></span>
-            {online ? 'Online' : 'Offline'}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-xs text-text-dim px-2">
-          <span>Database</span>
-          <span className="font-medium text-text">PostgreSQL</span>
-        </div>
-        <p className="text-[10px] text-text-dim text-center pt-2 border-t border-border">
-          SIH 2026 — Forensic Platform
-        </p>
-      </div>
-    </aside>
+    </header>
   )
 }
 
-export default function App() {
+function Sidebar({ open, setOpen }) {
+  const [online, setOnline] = useState(true)
+  useEffect(() => {
+    checkHealth().then(() => setOnline(true)).catch(() => setOnline(false))
+  }, [])
+
   return (
-    <BrowserRouter>
-      <div className="flex min-h-screen bg-surface-alt">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
+    <>
+      {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 backdrop-blur-[2px] lg:hidden" onClick={() => setOpen(false)} />}
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[272px] -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:relative lg:z-auto lg:translate-x-0 ${open ? 'translate-x-0' : ''}`}>
+        <div className="flex h-20 items-center justify-between border-b border-slate-100 px-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold tracking-wide text-white shadow-sm">VX</div>
+            <div>
+              <h1 className="text-base font-bold tracking-tight text-slate-950">VERTEX</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-slate-400">Forensic intelligence</p>
+            </div>
+          </div>
+          <button aria-label="Close navigation" onClick={() => setOpen(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700 lg:hidden"><Icon name="close" className="h-5 w-5" /></button>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3 py-5">
+          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Workspace</p>
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setOpen(false)} className={({ isActive }) => `group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium transition ${isActive ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}>
+              <Icon name={item.icon} className="h-[18px] w-[18px]" />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="border-t border-slate-100 p-4">
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-slate-500">Backend</span>
+              <span className="flex items-center gap-1.5 font-semibold text-slate-700"><span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-red-500'}`} />{online ? 'Online' : 'Offline'}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="font-medium text-slate-500">Storage</span>
+              <span className="font-semibold text-slate-700">PostgreSQL</span>
+            </div>
+          </div>
+          <p className="px-2 pt-3 text-center text-[10px] leading-4 text-slate-400">Evidence-first email forensics workspace</p>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+function Shell() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 lg:flex">
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center border-b border-slate-200/80 bg-white px-4 py-2 lg:hidden">
+          <button aria-label="Open navigation" onClick={() => setSidebarOpen(true)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-50"><Icon name="menu" className="h-5 w-5" /></button>
+          <span className="ml-2 text-sm font-bold tracking-tight">VERTEX</span>
+        </div>
+        <Header />
+        <main className="min-h-[calc(100vh-4rem)] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <Routes>
             <Route path="/" element={<UploadPage />} />
             <Route path="/emails" element={<EmailListPage />} />
@@ -107,6 +119,10 @@ export default function App() {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
+    </div>
   )
+}
+
+export default function App() {
+  return <BrowserRouter><Shell /></BrowserRouter>
 }

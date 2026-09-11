@@ -1,16 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listEmails } from '../api'
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleString()
-}
-
-function truncate(str, len = 40) {
-  if (!str) return '—'
-  return str.length > len ? str.slice(0, len) + '…' : str
-}
+function formatDate(dateStr) { return dateStr ? new Date(dateStr).toLocaleString() : '—' }
+function truncate(value, length = 55) { if (!value) return '—'; return value.length > length ? `${value.slice(0, length)}…` : value }
+function initials(value) { return (value || 'EM').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() }
 
 export default function EmailListPage() {
   const [emails, setEmails] = useState([])
@@ -18,81 +12,64 @@ export default function EmailListPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    listEmails()
-      .then(setEmails)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    let active = true
+    listEmails().then((data) => { if (active) setEmails(data || []) }).catch((err) => { if (active) setError(err.message) }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [])
 
+  const total = useMemo(() => emails.length, [emails])
+
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-text">Analyzed Emails</h2>
-          <p className="text-text-muted mt-1">{emails.length} email(s) analyzed</p>
+          <p className="section-label">Investigation inbox</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Analyzed emails</h1>
+          <p className="mt-2 text-sm text-slate-500">{total} forensic email record{total === 1 ? '' : 's'} in this workspace.</p>
         </div>
-        <Link
-          to="/"
-          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
-        >
-          + Upload New
-        </Link>
+        <Link to="/" className="btn-primary">+ Upload new email</Link>
       </div>
 
-      {loading && (
-        <div className="text-center py-12 text-text-dim">Loading...</div>
-      )}
+      {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
 
-      {error && (
-        <div className="p-4 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm mb-4">
-          {error}
+      {loading ? (
+        <div className="space-y-3">{[1, 2, 3, 4].map((i) => <div key={i} className="surface-card h-28 animate-pulse bg-slate-100" />)}</div>
+      ) : emails.length === 0 ? (
+        <div className="surface-card flex min-h-[420px] flex-col items-center justify-center px-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400"><span className="text-2xl">✉</span></div>
+          <h2 className="mt-5 text-lg font-semibold text-slate-900">No analyzed emails yet</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Upload your first <span className="font-mono text-slate-700">.eml</span> file to start building the forensic workspace.</p>
+          <Link to="/" className="mt-6 btn-primary">Upload first email</Link>
         </div>
-      )}
-
-      {!loading && emails.length === 0 && (
-        <div className="text-center py-16 bg-surface rounded-xl border border-border">
-          <svg className="w-16 h-16 mx-auto text-text-dim mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-          <p className="text-text-muted font-medium">No emails analyzed yet</p>
-          <Link to="/" className="text-primary text-sm mt-2 inline-block hover:underline">
-            Upload your first email →
-          </Link>
-        </div>
-      )}
-
-      {emails.length > 0 && (
-        <div className="bg-surface rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface-alt">
-                <th className="text-left px-4 py-3 font-medium text-text-muted">ID</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Subject</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">From</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">Date</th>
-                <th className="text-left px-4 py-3 font-medium text-text-muted">SHA-256</th>
-              </tr>
-            </thead>
-            <tbody>
-              {emails.map((email) => (
-                <tr key={email.id} className="border-b border-border/50 hover:bg-surface-alt transition-colors">
-                  <td className="px-4 py-3">
-                    <Link to={`/emails/${email.id}`} className="text-primary font-mono text-xs hover:underline">
-                      #{email.id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link to={`/emails/${email.id}`} className="text-text hover:text-primary transition-colors">
-                      {truncate(email.subject, 50)}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-text-muted">{truncate(email.sender, 30)}</td>
-                  <td className="px-4 py-3 text-text-dim text-xs">{formatDate(email.date)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-text-dim">{truncate(email.sha256, 16)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      ) : (
+        <div className="space-y-3">
+          {emails.map((email) => (
+            <Link key={email.id} to={`/emails/${email.id}`} className="surface-card group block p-4 transition hover:-translate-y-0.5 hover:border-slate-300 sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-3 sm:w-[29%] sm:min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-bold text-slate-600">{initials(email.sender_name || email.sender)}</div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{email.sender_name || email.sender || 'Unknown sender'}</p>
+                    <p className="truncate text-xs text-slate-400">{email.sender || '—'}</p>
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900 group-hover:text-indigo-600">{email.subject || '(no subject)'}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                    <span>{formatDate(email.date)}</span>
+                    <span className="font-mono">#{email.id}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:w-[27%] sm:justify-end">
+                  <div className="min-w-0 text-right">
+                    <p className="font-mono text-[10px] font-medium text-slate-400">SHA-256</p>
+                    <p className="truncate font-mono text-xs text-slate-600">{truncate(email.sha256, 22)}</p>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500">Open →</span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>

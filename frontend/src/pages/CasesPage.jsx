@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { listCases, createCase, listEmails, assignEmailToCase } from '../api'
 
 export default function CasesPage() {
@@ -15,223 +15,50 @@ export default function CasesPage() {
   const [assigning, setAssigning] = useState(false)
   const [assignMessage, setAssignMessage] = useState(null)
 
-  const fetchCasesAndEmails = () => {
-    Promise.all([listCases(), listEmails(0, 100)])
-      .then(([casesData, emailsData]) => {
-        setCases(casesData || [])
-        setEmails(emailsData || [])
-        setLoading(false)
-      })
-      .catch((err) => {
-        setError(err.message)
-        setLoading(false)
-      })
-  }
+  const fetchData = () => Promise.all([listCases(), listEmails(0, 100)]).then(([casesData, emailsData]) => { setCases(casesData || []); setEmails(emailsData || []) }).catch((err) => setError(err.message)).finally(() => setLoading(false))
+  useEffect(() => { fetchData() }, [])
 
-  useEffect(() => {
-    fetchCasesAndEmails()
-  }, [])
-
-  const handleCreateCase = async (e) => {
-    e.preventDefault()
-    if (!title.trim()) return
+  const handleCreateCase = async (event) => {
+    event.preventDefault(); if (!title.trim()) return
     setSubmitting(true)
-    try {
-      await createCase({ title: title.trim(), description: description.trim() || null })
-      setTitle('')
-      setDescription('')
-      setShowModal(false)
-      fetchCasesAndEmails()
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message)
-    } finally {
-      setSubmitting(false)
-    }
+    try { await createCase({ title: title.trim(), description: description.trim() || null }); setTitle(''); setDescription(''); setShowModal(false); setLoading(true); await fetchData() }
+    catch (err) { setError(err.response?.data?.detail || err.message) }
+    finally { setSubmitting(false) }
   }
 
   const handleAssign = async () => {
     if (!selectedCase || !selectedEmailId) return
-    setAssigning(true)
-    setAssignMessage(null)
-    try {
-      await assignEmailToCase(selectedCase.id, parseInt(selectedEmailId, 10))
-      setAssignMessage({ type: 'success', text: `Email #${selectedEmailId} successfully linked to case #${selectedCase.id}` })
-      fetchCasesAndEmails()
-    } catch (err) {
-      setAssignMessage({ type: 'error', text: err.response?.data?.detail || err.message })
-    } finally {
-      setAssigning(false)
-    }
+    setAssigning(true); setAssignMessage(null)
+    try { await assignEmailToCase(selectedCase.id, parseInt(selectedEmailId, 10)); setAssignMessage({ type: 'success', text: `Email #${selectedEmailId} linked to case #${selectedCase.id}.` }); await fetchData() }
+    catch (err) { setAssignMessage({ type: 'error', text: err.response?.data?.detail || err.message }) }
+    finally { setAssigning(false) }
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-text">Investigation Cases</h2>
-          <p className="text-text-muted mt-1">Organize and group suspicious emails into forensic cases</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
-        >
-          + New Case
-        </button>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="section-label">Case management</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Investigation cases</h1><p className="mt-2 text-sm text-slate-500">Group suspicious emails into focused forensic dossiers.</p></div>
+        <button onClick={() => setShowModal(true)} className="btn-primary">+ New case</button>
       </div>
 
-      {error && (
-        <div className="p-4 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
 
-      {loading ? (
-        <div className="text-center py-12 text-text-dim">Loading cases...</div>
-      ) : cases.length === 0 ? (
-        <div className="text-center py-16 bg-surface rounded-xl border border-border">
-          <p className="text-text-muted font-medium">No investigation cases created yet.</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-3 text-primary text-sm font-medium hover:underline"
-          >
-            Create your first case →
-          </button>
-        </div>
+      {loading ? <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[1,2,3].map((i) => <div key={i} className="surface-card h-44 animate-pulse bg-slate-100" />)}</div> : cases.length === 0 ? (
+        <div className="surface-card flex min-h-[360px] flex-col items-center justify-center px-6 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">◎</div><h2 className="mt-5 font-semibold text-slate-900">No investigation cases yet</h2><p className="mt-2 max-w-md text-sm text-slate-500">Create a case when you want a dedicated dossier for a campaign, sender or suspicious set of emails.</p><button onClick={() => setShowModal(true)} className="mt-5 btn-primary">Create first case</button></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cases.map((c) => (
-            <div
-              key={c.id}
-              className={`p-6 bg-surface rounded-xl border transition-all cursor-pointer ${
-                selectedCase?.id === c.id
-                  ? 'border-primary ring-2 ring-primary/20 shadow-sm'
-                  : 'border-border hover:border-primary/50'
-              }`}
-              onClick={() => setSelectedCase(c)}
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-xs font-mono text-primary font-semibold">CASE #{c.id}</span>
-                <span className="text-[10px] text-text-dim">
-                  {new Date(c.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <h3 className="text-lg font-semibold text-text mt-2">{c.title}</h3>
-              <p className="text-sm text-text-muted mt-1 line-clamp-2">
-                {c.description || 'No description provided.'}
-              </p>
-              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between text-xs text-text-dim">
-                <span>Created {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                <span className="text-primary font-medium hover:underline">Manage Dossier →</span>
-              </div>
-            </div>
-          ))}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {cases.map((item) => <button key={item.id} onClick={() => setSelectedCase(item)} className={`surface-card text-left p-5 transition hover:-translate-y-0.5 hover:border-slate-300 ${selectedCase?.id === item.id ? 'border-indigo-300 ring-2 ring-indigo-100' : ''}`}>
+            <div className="flex items-center justify-between"><span className="rounded-full bg-indigo-50 px-2.5 py-1 font-mono text-[10px] font-bold text-indigo-600">CASE #{item.id}</span><span className="text-[11px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</span></div>
+            <h3 className="mt-4 text-lg font-semibold tracking-tight text-slate-900">{item.title}</h3>
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">{item.description || 'No description provided.'}</p>
+            <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-400"><span>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span className="font-semibold text-indigo-600">Open dossier →</span></div>
+          </button>)}
         </div>
       )}
 
-      {/* Selected Case Detail & Email Linker */}
-      {selectedCase && (
-        <div className="p-6 bg-surface rounded-xl border border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-mono text-primary font-bold">CASE DOSSIER #{selectedCase.id}</span>
-              <h3 className="text-xl font-bold text-text mt-1">{selectedCase.title}</h3>
-              <p className="text-sm text-text-muted mt-1">{selectedCase.description}</p>
-            </div>
-            <button
-              onClick={() => setSelectedCase(null)}
-              className="text-text-dim hover:text-text text-sm"
-            >
-              ✕ Close
-            </button>
-          </div>
+      {selectedCase && <div className="surface-card p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="section-label text-indigo-500">Active dossier · #{selectedCase.id}</p><h2 className="mt-2 text-xl font-bold text-slate-950">{selectedCase.title}</h2><p className="mt-2 text-sm text-slate-500">{selectedCase.description || 'No description provided.'}</p></div><button onClick={() => setSelectedCase(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700">✕</button></div><div className="mt-6 border-t border-slate-100 pt-5"><p className="text-sm font-semibold text-slate-900">Link an analyzed email</p><div className="mt-3 flex flex-col gap-3 sm:flex-row"><select value={selectedEmailId} onChange={(e) => setSelectedEmailId(e.target.value)} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-indigo-500"><option value="">Select an analyzed email…</option>{emails.map((email) => <option key={email.id} value={email.id}>#{email.id} — {email.subject || '(no subject)'}</option>)}</select><button onClick={handleAssign} disabled={!selectedEmailId || assigning} className="btn-primary">{assigning ? 'Linking…' : 'Link to case'}</button></div>{assignMessage && <p className={`mt-3 text-xs font-medium ${assignMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>{assignMessage.text}</p>}</div></div>}
 
-          <div className="pt-4 border-t border-border">
-            <h4 className="text-sm font-semibold text-text mb-2">Link Analyzed Email to this Case</h4>
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={selectedEmailId}
-                onChange={(e) => setSelectedEmailId(e.target.value)}
-                className="px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:border-primary flex-1 max-w-md"
-              >
-                <option value="">Select an analyzed email to assign...</option>
-                {emails.map((em) => (
-                  <option key={em.id} value={em.id}>
-                    #{em.id} — {em.subject || '(no subject)'} ({em.sender})
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleAssign}
-                disabled={!selectedEmailId || assigning}
-                className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
-              >
-                {assigning ? 'Linking...' : 'Link to Case'}
-              </button>
-            </div>
-            {assignMessage && (
-              <p className={`text-xs mt-2 ${assignMessage.type === 'success' ? 'text-success' : 'text-danger'}`}>
-                {assignMessage.text}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Create Case Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-surface rounded-xl border border-border shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-text">Create Investigation Case</h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-text-dim hover:text-text text-sm"
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={handleCreateCase} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Case Title</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Executive Spoofing Campaign Q3"
-                  className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Details about attack indicators, targeted departments, or context..."
-                  className="w-full px-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-border rounded-lg text-sm text-text-muted hover:bg-surface-alt"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !title.trim()}
-                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark disabled:opacity-50"
-                >
-                  {submitting ? 'Creating...' : 'Create Case'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {showModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><p className="section-label">New investigation</p><h2 className="mt-1 text-lg font-bold text-slate-950">Create case</h2></div><button onClick={() => setShowModal(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-50">✕</button></div><form onSubmit={handleCreateCase} className="mt-5 space-y-4"><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Case title</span><input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Executive spoofing campaign" className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500" /></label><label className="block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Description</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Context, indicators, targeted teams…" className="w-full resize-none rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500" /></label><div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancel</button><button type="submit" disabled={submitting || !title.trim()} className="btn-primary">{submitting ? 'Creating…' : 'Create case'}</button></div></form></div></div>}
     </div>
   )
 }
