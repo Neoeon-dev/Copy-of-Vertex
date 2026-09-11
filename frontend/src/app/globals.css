@@ -2,6 +2,7 @@
 
 @theme {
   --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
   --color-surface-soft: #f4f4f5;
   --color-text: #111111;
   --color-text-secondary: #60646c;
@@ -17,23 +18,72 @@
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-:root { color-scheme: light; }
-html { background: var(--color-bg); }
-body { margin: 0; min-height: 100vh; background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+:root {
+  color-scheme: light;
+  --app-bg: #f7f7f8;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f4f4f5;
+  --app-text: #111111;
+  --app-text-secondary: #60646c;
+  --app-text-tertiary: #9aa0a6;
+  --app-border: #e2e3e6;
+  --app-border-strong: #cfd1d6;
+}
+
+html.dark {
+  color-scheme: dark;
+  --app-bg: #0b0b0d;
+  --app-surface: #111214;
+  --app-surface-soft: #17181b;
+  --app-text: #f5f5f5;
+  --app-text-secondary: #a4a8b0;
+  --app-text-tertiary: #777c86;
+  --app-border: #25272c;
+  --app-border-strong: #363942;
+}
+
+html, body { background: var(--app-bg); color: var(--app-text); }
+body { margin: 0; min-height: 100vh; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 ::selection { background: #d9ddff; }
 a { text-decoration: none; }
 
-.skeleton { position: relative; overflow: hidden; background: #ebecf0; }
-.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent); animation: shimmer 1.4s infinite; }
+/* Keep the component classes readable while allowing the theme toggle to affect legacy utility classes. */
+.bg-bg { background-color: var(--app-bg) !important; }
+.bg-surface { background-color: var(--app-surface) !important; }
+.bg-surface-soft { background-color: var(--app-surface-soft) !important; }
+.text-text { color: var(--app-text) !important; }
+.text-text-secondary { color: var(--app-text-secondary) !important; }
+.text-text-tertiary { color: var(--app-text-tertiary) !important; }
+.border-border { border-color: var(--app-border) !important; }
+.border-border-strong { border-color: var(--app-border-strong) !important; }
+.dark .bg-white { background-color: var(--app-surface) !important; }
+.dark .hover\\:bg-white:hover { background-color: var(--app-surface) !important; }
+.dark .bg-\\[\\#fafafa\\] { background-color: var(--app-bg) !important; }
+.dark .bg-indigo-50 { background-color: rgba(79,70,229,.12) !important; }
+.dark .bg-green-50 { background-color: rgba(22,128,60,.14) !important; }
+.dark .bg-amber-50 { background-color: rgba(168,93,0,.14) !important; }
+.dark .bg-red-50 { background-color: rgba(201,42,42,.14) !important; }
+.dark .bg-blue-50 { background-color: rgba(37,99,235,.14) !important; }
+.dark .border-indigo-200 { border-color: rgba(129,140,248,.3) !important; }
+.dark .border-green-200 { border-color: rgba(74,222,128,.25) !important; }
+.dark .border-amber-200 { border-color: rgba(251,191,36,.25) !important; }
+.dark .border-red-200 { border-color: rgba(248,113,113,.25) !important; }
+.dark .border-blue-200 { border-color: rgba(96,165,250,.25) !important; }
+.dark .text-red-900, .dark .text-amber-950, .dark .text-blue-950, .dark .text-green-900 { color: var(--app-text) !important; }
+
+.skeleton { position: relative; overflow: hidden; background: color-mix(in srgb, var(--app-surface-soft) 85%, var(--app-border)); border-radius: 1rem; }
+.skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shimmer 1.4s infinite; }
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #cfd2d8; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb { background: #cfd2d8; border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 .prose-email :where(p) { margin: .7rem 0; }
 .prose-email :where(a) { color: #4f46e5; text-decoration: underline; }
 .prose-email :where(img) { max-width: 100%; height: auto; }
+
+.focus-ring:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
