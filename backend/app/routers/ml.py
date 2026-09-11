@@ -43,18 +43,41 @@ def _run_classification(email_record: Email):
 
     from email.message import EmailMessage
     from email.policy import default
-    from email.utils import formataddr
+
+    # Prefer the pristine uploaded payload when available. It is the exact
+    # evidence bytes and avoids changing MIME semantics during reconstruction.
+    if email_record.raw_payload is not None and email_record.raw_payload.raw_bytes:
+        return service.predict_raw_email(email_record.raw_payload.raw_bytes)
 
     message = EmailMessage(policy=default)
+
+    # Structural MIME headers describe the original wire representation. Do not
+    # copy them onto a newly constructed EmailMessage because set_content() /
+    # add_alternative() must be allowed to choose the new MIME structure.
+    structural_headers = {
+        "content-type",
+        "content-transfer-encoding",
+        "mime-version",
+        "content-disposition",
+        "content-id",
+    }
     for header in email_record.headers:
+        if header.name.lower() in structural_headers:
+            continue
         message[header.name] = header.value
 
     # Rebuild a MIME representation from the stored evidence so the forensic
-    # extractor sees headers, body, and attachment metadata/content.
-    if email_record.body_text:
+    # extractor still sees headers, body, and attachment metadata/content.
+    if email_record.body_text and email_record.body_html:
+        message.set_content(email_record.body_text)
+        message.add_alternative(email_record.body_html, subtype="html")
+    elif email_record.body_text:
         message.set_content(email_record.body_text)
     elif email_record.body_html:
+        message.set_content("This message contains an HTML body.")
         message.add_alternative(email_record.body_html, subtype="html")
+    else:
+        message.set_content("")
 
     for attachment in email_record.attachments:
         content = attachment.content or b""
@@ -67,9 +90,7 @@ def _run_classification(email_record: Email):
             filename=attachment.filename or "attachment",
         )
 
-    raw_bytes = message.as_bytes()
-
-    return service.predict_raw_email(raw_bytes)
+    return service.predict_raw_email(message.as_bytes())
 
 
 def _to_response(email_id: int, prediction) -> MLClassificationOut:
