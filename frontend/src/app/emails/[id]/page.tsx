@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { motion } from 'motion/react'
-import { Activity, AlertTriangle, CheckCircle2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, Mail, Paperclip, Server, ShieldAlert, ShieldCheck, Waypoints } from 'lucide-react'
+import { Activity, CheckCircle2, Copy, Download, FileText, Globe2, Link2, LockKeyhole, Mail, Paperclip, Server, ShieldAlert, ShieldCheck, Waypoints } from 'lucide-react'
 import { Alert, Badge, Button, Card, Page, PageHeader, Skeleton } from '../../../components/ui'
 import { addEmailToGraph, apiError, classifyEmail, computeRisk, getAuthentication, getEmail, getReportUrl, runFullAnalysis, verifyEvidence } from '../../../lib/api'
 import { formatBytes, formatDate, humanize, riskTone } from '../../../lib/utils'
@@ -77,24 +77,22 @@ export default function EmailDetailPage() {
         </Card>
 
         {risk || analysis ? <>
-          <PlainEnglishSummary email={email} auth={auth} ml={ml} analysis={analysis} risk={risk} level={level} score={score}/>
-
           <Card className="overflow-hidden p-5 sm:p-6">
             <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-center">
               <RiskGauge score={score ?? 0} level={level}/>
               <div>
-                <div className="flex flex-wrap items-center gap-2"><Badge tone={riskTone(level)}>{humanRiskLevel(level)}</Badge>{ml ? <span className="text-xs font-semibold text-text-secondary">Automated classifier: {humanClassification(ml.label)} · {Math.round(ml.confidence * 100)}% confidence</span> : null}</div>
-                <p className="mt-3 text-sm leading-6 text-text-secondary">{risk?.summary ? risk.summary.replace(/Risk level: .*?\. ?/i, '') || 'The weighted risk engine combined several independent signals from the message.' : 'The available analysis has been translated into a human-readable risk view below.'}</p>
+                <div className="flex flex-wrap items-center gap-2"><Badge tone={riskTone(level)}>{level}</Badge>{ml ? <span className="text-xs font-semibold text-text-secondary">Classifier: {ml.label} · {Math.round(ml.confidence * 100)}% confidence</span> : null}</div>
+                {risk?.summary ? <p className="mt-3 text-sm leading-6 text-text-secondary">{risk.summary}</p> : null}
                 <RiskCategoryChart rows={categoryRows}/>
               </div>
             </div>
           </Card>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            {ml ? <ProbabilityChart ml={ml}/> : <Card className="p-5"><SectionHeading icon={ShieldAlert} title="Threat classification"/><p className="mt-4 text-sm text-text-secondary">Run the analysis to see how strongly the message resembles legitimate mail, suspicious mail, phishing, or spam.</p></Card>}
-            {analysis ? <IndicatorChart analysis={analysis} email={email}/> : <Card className="p-5"><SectionHeading icon={Server} title="What was found"/><p className="mt-4 text-sm text-text-secondary">The forensic pipeline has not returned its indicator counts yet.</p></Card>}
+            {ml ? <ProbabilityChart ml={ml}/> : <Card className="p-5"><SectionHeading icon={ShieldAlert} title="Model classification"/><p className="mt-4 text-sm text-text-secondary">Run the full analysis to populate the classifier probabilities and signal breakdown.</p></Card>}
+            {analysis ? <IndicatorChart analysis={analysis} email={email}/> : <Card className="p-5"><SectionHeading icon={Server} title="Forensic indicators"/><p className="mt-4 text-sm text-text-secondary">The graph fills after the full forensic pipeline returns.</p></Card>}
           </div>
-        </> : <Card className="p-6"><div className="flex items-start gap-3"><ShieldAlert size={18} className="mt-0.5 text-text-secondary"/><div><div className="text-sm font-bold">No risk verdict yet</div><div className="mt-1 text-sm leading-6 text-text-secondary">Run the full analysis to turn the raw message into a plain-English assessment with a visual explanation of why VERTEX reached its conclusion.</div></div></div></Card>}
+        </> : <Card className="p-6"><div className="flex items-start gap-3"><ShieldAlert size={18} className="mt-0.5 text-text-secondary"/><div><div className="text-sm font-bold">Risk has not been assessed yet</div><div className="mt-1 text-sm leading-6 text-text-secondary">Run the full analysis to calculate the weighted 0–100 score and the explainable signal breakdown.</div></div></div></Card>}
 
         <div className="grid gap-5 md:grid-cols-2"><AuthCard auth={auth}/><Card className="p-5"><SectionHeading icon={Mail} title="Message metadata"/><div className="mt-4 space-y-3"><Row label="From" value={email.sender}/><Row label="Display name" value={email.sender_name}/><Row label="Reply-To" value={email.reply_to}/><Row label="To" value={email.to.map((x) => x.address || x.name).filter(Boolean).join(', ') || '—'}/><Row label="Date" value={formatDate(email.date)}/><Row label="Message-ID" value={email.message_id}/></div></Card></div>
 
@@ -127,66 +125,29 @@ function RiskGauge({ score, level }: { score: number; level: string }) {
   return <div className="relative mx-auto grid h-[190px] w-[190px] place-items-center"><svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" className="text-surface-soft" strokeWidth="9"/><motion.circle cx="60" cy="60" r="52" fill="none" stroke={stroke} strokeWidth="9" strokeLinecap="round" strokeDasharray={circumference} initial={{strokeDashoffset:circumference}} animate={{strokeDashoffset:offset}} transition={{duration:.8,ease:'easeOut'}}/></svg><div className="text-center"><div className="text-4xl font-black tracking-tight">{Math.round(clamped)}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-[.14em] text-text-tertiary">risk score</div></div></div>
 }
 
-function PlainEnglishSummary({ email, auth, ml, analysis, risk, level, score }: { email: EmailDetail; auth: AuthenticationSummary | null; ml: MLClassification | null; analysis: FullAnalysis | null; risk: RiskAssessment | null; level: string; score: number | null }) {
-  const authItems = [auth?.spf, auth?.dkim, auth?.dmarc].filter(Boolean) as Array<NonNullable<AuthenticationSummary['spf']>>
-  const failedAuth = authItems.filter((item) => ['FAIL', 'SOFTFAIL', 'PERMERROR', 'TEMPERROR'].includes(item.result)).length
-  const suspiciousSignals = risk?.contributions?.filter((item) => item.contribution > 0).length ?? 0
-  const indicatorCount = analysis ? analysis.public_ips.length + analysis.private_ips.length + analysis.domain_analysis.length + analysis.total_urls + email.attachments.length : 0
-  const levelText = level === 'CRITICAL' ? 'needs immediate attention' : level === 'HIGH' ? 'needs attention' : level === 'MEDIUM' ? 'deserves a closer look' : level === 'LOW' ? 'currently looks low risk' : 'has not received a final risk verdict yet'
-  const explanation = score === null ? 'Run the full analysis to generate a defensible risk verdict from the message signals.' : `Based on the available signals, this message ${levelText}. ${suspiciousSignals ? `${suspiciousSignals} risk signals are contributing to the score.` : 'No positive risk contributions are currently being reported.'}`
-  const authText = failedAuth === 0 ? (authItems.length ? 'Authentication checks did not return a failure.' : 'Authentication checks have not produced enough results yet.') : `${failedAuth} authentication check${failedAuth === 1 ? '' : 's'} returned a failure or warning.`
-  const mlText = ml ? `The classifier currently considers this ${humanClassification(ml.label)} with ${Math.round(ml.confidence * 100)}% confidence.` : 'The classifier has not been run yet.'
-  const indicatorText = analysis ? `${indicatorCount} observable indicators were returned across routing, domains, links, IPs, and attachments.` : 'Forensic indicator details are not available until the full analysis completes.'
-  return <Card className="border-primary/20 bg-primary/5 p-5 sm:p-6">
-    <div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-surface text-primary shadow-sm"><AlertTriangle size={17}/></div><div><div className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Human-readable assessment</div><div className="mt-1 text-base font-black">What should a person take away from this message?</div><p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">{explanation}</p></div></div>
-    <div className="mt-5 grid gap-3 md:grid-cols-3">
-      <Insight label="Sender verification" text={authText} tone={failedAuth ? 'warning' : 'success'}/>
-      <Insight label="Threat pattern" text={mlText} tone={ml?.label === 'phishing' ? 'danger' : ml?.label === 'suspicious' || ml?.label === 'spammer' ? 'warning' : 'neutral'}/>
-      <Insight label="Evidence found" text={indicatorText} tone={analysis && indicatorCount ? 'info' : 'neutral'}/>
-    </div>
-  </Card>
-}
-
-function Insight({ label, text, tone }: { label: string; text: string; tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }) {
-  const dot = tone === 'success' ? 'bg-success' : tone === 'warning' ? 'bg-warning' : tone === 'danger' ? 'bg-danger' : tone === 'info' ? 'bg-info' : 'bg-text-tertiary'
-  return <div className="rounded-2xl border border-border bg-surface p-4"><div className="flex items-center gap-2 text-xs font-black"><span className={`h-2 w-2 rounded-full ${dot}`}/>{label}</div><p className="mt-2 text-xs leading-5 text-text-secondary">{text}</p></div>
-}
-
-function humanRiskLevel(level: string) {
-  return level === 'UNASSESSED' ? 'Not assessed' : level.charAt(0) + level.slice(1).toLowerCase()
-}
-
-function humanClassification(label: string) {
-  return ({ legitimate: 'likely legitimate', suspicious: 'suspicious', phishing: 'likely phishing', spammer: 'likely spam' } as Record<string, string>)[label] || humanize(label)
-}
-
 function RiskCategoryChart({ rows }: { rows: [string, number][] }) {
-  return <div className="mt-5"><div className="mb-3 text-[10px] font-black uppercase tracking-[.14em] text-text-tertiary">Why the score looks this way</div><div className="space-y-3">{rows.slice(0, 8).map(([name, value]) => <div key={name}><div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] font-bold"><span className="text-text-secondary">{humanCategory(name)}</span><span className="font-mono text-text-tertiary">{Math.round(value)}/100</span></div><div className="h-2.5 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.min(100, Math.max(0, value))}%`}} transition={{duration:.5}} className={`h-full rounded-full ${value >= 60 ? 'bg-danger' : value >= 30 ? 'bg-warning' : 'bg-slate-950 dark:bg-white'}`}/></div></div>)}</div></div>
-}
-
-function humanCategory(name: string) {
-  return ({ ml_classification: 'Threat classification', authentication: 'Sender authentication', identity_mismatch: 'Sender identity mismatch', domain_intelligence: 'Domain reputation', url_analysis: 'Link safety', attachment_risk: 'Attachment risk', header_anomalies: 'Mail-path anomalies', infrastructure: 'Infrastructure signals' } as Record<string, string>)[name] || humanize(name)
+  return <div className="mt-5"><div className="mb-3 text-[10px] font-black uppercase tracking-[.14em] text-text-tertiary">Risk categories</div><div className="space-y-3">{rows.slice(0, 8).map(([name, value]) => <div key={name}><div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] font-bold"><span className="text-text-secondary">{humanize(name)}</span><span className="font-mono text-text-tertiary">{Math.round(value)}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.min(100, Math.max(0, value))}%`}} transition={{duration:.5}} className={`h-full rounded-full ${value >= 60 ? 'bg-danger' : value >= 30 ? 'bg-warning' : 'bg-slate-950 dark:bg-white'}`}/></div></div>)}</div></div>
 }
 
 function ProbabilityChart({ ml }: { ml: MLClassification }) {
   const rows = Object.entries(ml.probabilities).sort((a, b) => Number(b[1]) - Number(a[1]))
-  return <Card className="p-5"><SectionHeading icon={Activity} title="How the message was classified"/><p className="mt-1 text-xs text-text-secondary">How strongly the classifier matched each plain-English message category.</p><div className="mt-5 space-y-3">{rows.slice(0, 5).map(([label, value]) => <div key={label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{humanize(label)}</span><span className="font-mono text-text-tertiary">{Math.round(value * 100)}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.round(value * 100)}%`}} className="h-full rounded-full bg-primary"/></div></div>)}</div></Card>
+  return <Card className="p-5"><SectionHeading icon={Activity} title="Model probabilities"/><p className="mt-1 text-xs text-text-secondary">Classification confidence returned by the backend model.</p><div className="mt-5 space-y-3">{rows.slice(0, 5).map(([label, value]) => <div key={label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{humanize(label)}</span><span className="font-mono text-text-tertiary">{Math.round(value * 100)}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${Math.round(value * 100)}%`}} className="h-full rounded-full bg-primary"/></div></div>)}</div></Card>
 }
 
 function IndicatorChart({ analysis, email }: { analysis: FullAnalysis; email: EmailDetail }) {
   const points = [
-    { label:'Public sending IPs', value:analysis.public_ips.length, max:Math.max(1, analysis.public_ips.length, analysis.private_ips.length), tone:'bg-blue-500' },
-    { label:'Private relay hops', value:analysis.private_ips.length, max:Math.max(1, analysis.public_ips.length, analysis.private_ips.length), tone:'bg-slate-500' },
-    { label:'Domains mentioned', value:analysis.domain_analysis.length, max:Math.max(1, analysis.domain_analysis.length, analysis.urls.length), tone:'bg-indigo-500' },
-    { label:'Links found', value:analysis.total_urls, max:Math.max(1, analysis.domain_analysis.length, analysis.total_urls), tone:'bg-amber-500' },
+    { label:'Public IPs', value:analysis.public_ips.length, max:Math.max(1, analysis.public_ips.length, analysis.private_ips.length), tone:'bg-blue-500' },
+    { label:'Private IPs', value:analysis.private_ips.length, max:Math.max(1, analysis.public_ips.length, analysis.private_ips.length), tone:'bg-slate-500' },
+    { label:'Domains', value:analysis.domain_analysis.length, max:Math.max(1, analysis.domain_analysis.length, analysis.urls.length), tone:'bg-indigo-500' },
+    { label:'URLs', value:analysis.total_urls, max:Math.max(1, analysis.domain_analysis.length, analysis.total_urls), tone:'bg-amber-500' },
     { label:'Attachments', value:email.attachments.length, max:Math.max(1, email.attachments.length, analysis.total_urls), tone:'bg-rose-500' },
   ]
-  return <Card className="p-5"><SectionHeading icon={Server} title="What the forensic scan found"/><p className="mt-1 text-xs text-text-secondary">A visual summary of the observable evidence found in this message.</p><div className="mt-5 space-y-3">{points.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{item.label}</span><span className="font-mono text-text-tertiary">{item.value}</span></div><div className="h-3 overflow-hidden rounded-full bg-surface-soft"><div className={`h-full rounded-full ${item.tone}`} style={{width:`${Math.min(100, item.value / item.max * 100)}%`}}/></div></div>)}</div></Card>
+  return <Card className="p-5"><SectionHeading icon={Server} title="Forensic indicator volume"/><p className="mt-1 text-xs text-text-secondary">Count of indicators returned by each analysis module.</p><div className="mt-5 space-y-3">{points.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between text-xs font-semibold"><span>{item.label}</span><span className="font-mono text-text-tertiary">{item.value}</span></div><div className="h-3 overflow-hidden rounded-full bg-surface-soft"><div className={`h-full rounded-full ${item.tone}`} style={{width:`${Math.min(100, item.value / item.max * 100)}%`}}/></div></div>)}</div></Card>
 }
 
 function SignalContributionChart({ items }: { items: RiskAssessment['contributions'] }) {
   const max = Math.max(...items.map((item) => item.contribution), 1)
-  return <Card className="p-5"><SectionHeading icon={ShieldCheck} title="Why VERTEX is concerned"/><p className="mt-1 text-xs text-text-secondary">These are the strongest positive risk contributors returned by the explainable scoring engine.</p><div className="mt-5 space-y-3">{items.map((item, index) => <div key={`${item.signal}-${index}`}><div className="mb-1 flex items-start justify-between gap-3 text-xs"><div className="min-w-0"><div className="font-semibold">{humanize(item.signal)}</div><div className="mt-0.5 truncate text-[10px] text-text-tertiary">{item.description}</div></div><span className="shrink-0 rounded-full bg-surface-soft px-2 py-1 font-mono text-[10px] font-bold">+{item.contribution.toFixed(1)}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${item.contribution / max * 100}%`}} className="h-full rounded-full bg-slate-950 dark:bg-white"/></div></div>)}</div></Card>
+  return <Card className="p-5"><SectionHeading icon={ShieldCheck} title="Top contributing signals"/><p className="mt-1 text-xs text-text-secondary">The same explainable signal values are visualized here instead of a plain list.</p><div className="mt-5 space-y-3">{items.map((item, index) => <div key={`${item.signal}-${index}`}><div className="mb-1 flex items-start justify-between gap-3 text-xs"><div className="min-w-0"><div className="font-semibold">{humanize(item.signal)}</div><div className="mt-0.5 truncate text-[10px] text-text-tertiary">{item.description}</div></div><span className="shrink-0 rounded-full bg-surface-soft px-2 py-1 font-mono text-[10px] font-bold">+{item.contribution.toFixed(1)}</span></div><div className="h-2 overflow-hidden rounded-full bg-surface-soft"><motion.div initial={{width:0}} animate={{width:`${item.contribution / max * 100}%`}} className="h-full rounded-full bg-slate-950 dark:bg-white"/></div></div>)}</div></Card>
 }
 
 function InvestigationTimeline({ email, auth, analysis, risk, verification }: { email: EmailDetail; auth: AuthenticationSummary | null; analysis: FullAnalysis | null; risk: RiskAssessment | null; verification: Awaited<ReturnType<typeof verifyEvidence>> | null }) {

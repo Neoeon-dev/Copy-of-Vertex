@@ -60,6 +60,7 @@ a { text-decoration: none; }
 .border-border { border-color: var(--app-border) !important; }
 .border-border-strong { border-color: var(--app-border-strong) !important; }
 html.dark .bg-white { background-color: var(--app-surface) !important; }
+html.dark .hover\:bg-white:hover { background-color: var(--app-surface) !important; }
 html.dark .bg-\[\#fafafa\] { background-color: var(--app-bg) !important; }
 html.dark .bg-indigo-50 { background-color: rgba(79,70,229,.12) !important; }
 html.dark .bg-green-50 { background-color: rgba(22,128,60,.14) !important; }
